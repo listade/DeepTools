@@ -1,0 +1,7 @@
+.vscode/
+__pycache__/
+env/
+saved_model/
+input/
+output/
+*.ini
