@@ -1,3 +1,4 @@
+import argparse
 import configparser
 import os
 
@@ -6,31 +7,37 @@ import numpy as np
 import torch
 from torchvision.ops import nms
 
-from .models.experimental import attempt_load
 from .utils.datasets import LoadImages_
 from .utils.general import non_max_suppression, plot_one_box, scale_coords
 
 
 if __name__ == '__main__':
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--config", type=str, default="default.ini")
+    opt = parser.parse_args()
+
     config = configparser.ConfigParser()
-    config.read("config.ini")
+    config.read(opt.config)
 
-    config = config["Inference"]
-    device = config["Device"]
-    weights = config["WeightsPath"]
-    input_dir = config["InputDir"]
-    output_dir = config["OutputDir"]
+    net = config["Net"]
+    device = net["Device"]
 
-    width = int(config["Width"])
-    overlap = int(config["Overlap"])
-    conf_thres = float(config["ConfThres"])
-    iou_thres = float(config["IouThres"])
+    pre = config["Pre"]
+    width = int(pre["Width"])
+    overlap = int(pre["Overlap"])
+
+    infer = config["Infer"]
+    input_dir = infer["InputDir"]
+    output_dir = infer["OutputDir"]
+    weights = infer["WeightsPath"]
+    conf_thres = float(infer["ConfThres"])
+    iou_thres = float(infer["IouThres"])
 
     device = torch.device(device)
     dataset = LoadImages_(input_dir, img_size=width)
 
     with torch.no_grad():
-        model = attempt_load(weights, map_location=device)  # load FP32 model
+        model = torch.load(weights, map_location=device)['model'].float().fuse().eval()  # load FP32 model
 
         for path, img_np in dataset:
             im_height, im_width = img_np.shape[:-1]
