@@ -91,14 +91,14 @@ def inference(opt):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
 
-    parser.add_argument("--input", type=str, default="input")
-    parser.add_argument("--output", type=str, default="output")
-    parser.add_argument("--weights", type=str, default="yolov4-p5.pt")
-    parser.add_argument("--device", type=str, default="cuda")
-    parser.add_argument("--conf-thres", type=float, default=0.5)
-    parser.add_argument("--iou-thres", type=float, default=0.1)
-    parser.add_argument("--img-size", type=int, default=640)
-    parser.add_argument("--overlap", type=int, default=100)
+    parser.add_argument("--input", type=str, default="input", metavar="<path-to-images>")
+    parser.add_argument("--output", type=str, default="output", metavar="<path-to-txt>")
+    parser.add_argument("--weights", type=str, default="yolov4-p5.pt", metavar="<path-to-*.pt>")
+    parser.add_argument("--device", type=str, default="cuda", metavar="<cuda|cpu>")
+    parser.add_argument("--conf-thres", type=float, default=0.5, metavar="<0-1.0>")
+    parser.add_argument("--iou-thres", type=float, default=0.1, metavar="<0-1.0>")
+    parser.add_argument("--img-size", type=int, default=640, metavar="<px>")
+    parser.add_argument("--overlap", type=int, default=100, metavar="<px>")
 
     opt = parser.parse_args()
 
