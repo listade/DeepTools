@@ -1,6 +1,7 @@
 import argparse
 import configparser
 import os
+import warnings
 
 import cv2
 import numpy as np
@@ -10,6 +11,7 @@ from torchvision.ops import nms
 from .utils.datasets import LoadImages_
 from .utils.general import non_max_suppression, plot_one_box, scale_coords
 
+warnings.filterwarnings("ignore", category=UserWarning)
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
