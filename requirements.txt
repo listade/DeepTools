@@ -9,3 +9,7 @@ torch
 torchaudio
 torchvision
 tensorboard
+tiler
+pyproj
+pytorch_lightning
+albumentations
