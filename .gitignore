@@ -1,3 +1,11 @@
 .vscode/
 __pycache__/
 env/
+
+input/
+output/
+train/
+valid/
+test/
+weights/
+runs/
