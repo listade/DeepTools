@@ -1,4 +1,0 @@
-train: C:\Users\User\Desktop\Python\Data\train
-val: C:\Users\User\Desktop\Python\Data\valid
-nc: 1
-names: [foobar]
