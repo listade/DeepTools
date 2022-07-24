@@ -31,7 +31,7 @@ class Dataset(BaseDataset):
         return len(self.files)
 
 
-def inference(opt):
+def detect(opt):
     device = torch.device(opt.device)
     state_dict = torch.load(opt.weights)
 
@@ -110,4 +110,4 @@ if __name__ == "__main__":
 
     opt = parser.parse_args()
 
-    inference(opt)
+    detect(opt)

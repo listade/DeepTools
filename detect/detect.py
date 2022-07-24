@@ -13,7 +13,7 @@ from .utils.general import non_max_suppression, plot_one_box, scale_coords
 warnings.filterwarnings("ignore", category=UserWarning)
 
 
-def inference(opt):
+def detect(opt):
     device = torch.device(opt.device)
     dataset = LoadImages_(opt.input, img_size=opt.img_size)
 
@@ -102,4 +102,4 @@ if __name__ == '__main__':
 
     opt = parser.parse_args()
 
-    inference(opt)
+    detect(opt)
