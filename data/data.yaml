@@ -1,10 +1,9 @@
 # train and val datasets (image directory or *.txt file with image paths)
-train: ./train
-val: ./valid
-test: ./test
+train: ./train/images
+val: ./valid/images
 
 # number of classes
-nc: 1
+nc: 3
 
 # class names
-names: []
+names: ["car", "stump", "fire"]
