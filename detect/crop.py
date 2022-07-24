@@ -5,7 +5,7 @@ import os
 import cv2
 import numpy as np
 
-from .general import xywh2xyxy, xyxy2xywh
+from .utils.general import xywh2xyxy, xyxy2xywh
 
 
 def crop(img_path, txt_path, img_size=640, draw_labels=False):

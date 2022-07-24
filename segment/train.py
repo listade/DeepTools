@@ -8,7 +8,6 @@ import numpy as np
 import pytorch_lightning as pl
 import segmentation_models_pytorch as smp
 import torch
-import yaml
 from pytorch_lightning.callbacks import ModelCheckpoint
 from tiler import Tiler
 from torch.utils.data import DataLoader, IterableDataset
@@ -81,10 +80,8 @@ class Dataset(IterableDataset):
 
 
 def train(opt):
-    with open(opt.data) as f:
-        data = yaml.load(f, Loader=yaml.FullLoader)
 
-    train_dataset = Dataset(path=data["train"],
+    train_dataset = Dataset(path=opt.train,
                             width=opt.img_size,
                             overlap=opt.overlap,
                             shrink=opt.shrink,
@@ -93,7 +90,7 @@ def train(opt):
                             encoder_weights=opt.encoder_weights,
                             augment=get_training_augmentation())
 
-    valid_dataset = Dataset(path=data["val"],
+    valid_dataset = Dataset(path=opt.valid,
                             width=opt.img_size,
                             overlap=opt.overlap,
                             shrink=opt.shrink,
@@ -128,7 +125,7 @@ def train(opt):
     model = SegModel(opt.arch,
                      opt.encoder,
                      in_channels=3,
-                     out_classes=data["nc"])
+                     out_classes=opt.nc)
     model.to(device)
 
     trainer.fit(model.to(device),
@@ -139,7 +136,9 @@ def train(opt):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
 
-    parser.add_argument("--data", type=str, default="data.yaml", metavar="<str>")
+    parser.add_argument("--train", type=str, default="train", metavar="<path-to-images>")
+    parser.add_argument("--valid", type=str, default="valid", metavar="<path-to-images>")
+    parser.add_argument("--nc", type=int, default=1, metavar="<classes>")
     parser.add_argument("--name", type=str, default="weights", metavar="<str>")
     parser.add_argument("--batch-size", type=int, default=4, metavar="<int>")
     parser.add_argument("--device", type=str, default="cuda", metavar="<cuda|cpu>")
