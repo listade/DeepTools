@@ -7,9 +7,6 @@ Install
   $ pip install git+https://github.com/JunnYu/mish-cuda
   $ pip install git+https://github.com/qubvel/segmentation_models.pytorch
   $ pip install -r requirements.txt
-```
 
-Check CUDA
-```
   $ python -c "import torch;print(torch.cuda.is_available())"
 ```
