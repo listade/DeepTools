@@ -1,4 +1,5 @@
 import argparse
+import glob
 import os
 import warnings
 
@@ -6,19 +7,37 @@ import cv2
 import numpy as np
 import torch
 from torchvision.ops import nms
-
-from .utils.datasets import LoadImages_
+from torch.utils.data import Dataset
 from .utils.general import non_max_suppression, plot_one_box, scale_coords
 
 warnings.filterwarnings("ignore", category=UserWarning)
 
 
+class ImagesDataset(Dataset):
+
+    def __init__(self, path="."):
+        mask = os.path.join(path, "*.jpg")
+        self.files = glob.glob(mask)
+
+    def __getitem__(self, i):
+        path = self.files[i]
+        print(f"[{i+1}/{len(self)}] {path}")
+
+        img_np = cv2.imread(path)
+        img_np = cv2.cvtColor(img_np, cv2.COLOR_BGR2RGB)
+
+        return path, img_np
+
+    def __len__(self):
+        return len(self.files)
+
+
 def detect(opt):
     device = torch.device(opt.device)
-    dataset = LoadImages_(opt.input, img_size=opt.img_size)
+    dataset = ImagesDataset(opt.input)
 
     with torch.no_grad():
-        model = torch.load(opt.weights, map_location=device)['model'].float().fuse().eval()  # load FP32 model
+        model = torch.load(opt.weights, map_location=device)["model"].float().fuse().eval()  # load FP32 model
 
         for path, img_np in dataset:
             im_height, im_width = img_np.shape[:-1]
@@ -30,19 +49,19 @@ def detect(opt):
                     tile_height, tile_width = im_tile.shape[:-1]
 
                     if tile_width < opt.img_size and tile_height == opt.img_size:
-                        im_tile = np.pad(im_tile, [(0, 0), (0, opt.img_size-tile_width), (0, 0)], mode='constant', constant_values=114)
+                        im_tile = np.pad(im_tile, [(0, 0), (0, opt.img_size-tile_width), (0, 0)], mode="constant", constant_values=114)
                     elif tile_height < opt.img_size and tile_width == opt.img_size:
-                        im_tile = np.pad(im_tile, [(0, opt.img_size-tile_height), (0, 0), (0, 0)], mode='constant', constant_values=114)
+                        im_tile = np.pad(im_tile, [(0, opt.img_size-tile_height), (0, 0), (0, 0)], mode="constant", constant_values=114)
                     elif tile_width < opt.img_size and tile_height < opt.img_size:
-                        im_tile = np.pad(im_tile, [(0, opt.img_size-tile_height), (0, opt.img_size-tile_width), (0, 0)], mode='constant', constant_values=114)
+                        im_tile = np.pad(im_tile, [(0, opt.img_size-tile_height), (0, opt.img_size-tile_width), (0, 0)], mode="constant", constant_values=114)
                     elif tile_width > opt.img_size or tile_height > opt.img_size:
-                        raise ValueError('dimension mismatch: cropped image size')
+                        raise ValueError("dimension mismatch: cropped image size")
 
                     init_im_size = im_tile.shape[:-1]  # initial crop size 1024x1024
                     im_tile = cv2.resize(im_tile, (640, 640))
 
                     # Convert
-                    im_tile = im_tile[:, :, ::-1]  # BGR to RGB
+                    # im_tile = im_tile[:, :, ::-1]  # BGR to RGB
                     im_tile = np.ascontiguousarray(im_tile)
 
                     im_tile = torch.from_numpy(im_tile).to(device)
@@ -81,20 +100,24 @@ def detect(opt):
             dets[:, [4, 5]] = dets[:, [5, 4]]
 
             file = os.path.join(opt.output, os.path.basename(path))
-            np.savetxt(file + '.txt', dets, fmt=('%d', '%d', '%d', '%d', '%d', '%1.3f')) # x1 y1 x2 y2 cls score
+            fmt = ("%d", "%d", "%d", "%d", "%d", "%1.3f")
+
+            np.savetxt(file.replace(".jpg", ".txt"), dets, fmt=fmt) # x1 y1 x2 y2 cls score
 
             for v in dets:
                 plot_one_box(v[:4], img_np, line_thickness=1)
+
             cv2.imwrite(file, img_np)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     parser = argparse.ArgumentParser()
 
     parser.add_argument("--input", type=str, default="input", metavar="<path-to-images>")
     parser.add_argument("--output", type=str, default="output", metavar="<path-to-txt>")
     parser.add_argument("--weights", type=str, default="yolov4-p5.pt", metavar="<path-to-*.pt>")
     parser.add_argument("--device", type=str, default="cuda", metavar="<cuda|cpu>")
+
     parser.add_argument("--conf-thres", type=float, default=0.5, metavar="<0-1.0>")
     parser.add_argument("--iou-thres", type=float, default=0.1, metavar="<0-1.0>")
     parser.add_argument("--img-size", type=int, default=640, metavar="<px>")

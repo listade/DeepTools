@@ -7,12 +7,12 @@ import numpy as np
 import segmentation_models_pytorch as smp
 import torch
 from tiler import Merger, Tiler
-from torch.utils.data import Dataset as BaseDataset
+from torch.utils.data import Dataset
 
 from .model import SegModel
 
 
-class Dataset(BaseDataset):
+class ImagesDataset(Dataset):
 
     def __init__(self, path="."):
         mask = os.path.join(path, "*.jpg")
@@ -47,7 +47,7 @@ def detect(opt):
         model.eval()
         prep = smp.encoders.get_preprocessing_fn(encoder_name=opt.encoder,
                                                 pretrained=opt.encoder_weights)
-        dataset = Dataset(opt.input)
+        dataset = ImagesDataset(opt.input)
 
         for image, img_np in dataset:
             img_res = cv2.resize(img_np,

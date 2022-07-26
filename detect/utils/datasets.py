@@ -71,55 +71,6 @@ def create_dataloader(path, imgsz, batch_size, stride, opt, hyp=None, augment=Fa
     return dataloader, dataset
     
 
-# modified class for large imgs (VNIIRO project)
-class LoadImages_:  # for inference
-    def __init__(self, path, img_size=640):
-        p = str(Path(path))  # os-agnostic
-        p = os.path.abspath(p)  # absolute path
-        if '*' in p:
-            files = sorted(glob.glob(p))  # glob
-        elif os.path.isdir(p):
-            files = sorted(glob.glob(os.path.join(p, '*.*')))  # dir
-        elif os.path.isfile(p):
-            files = [p]  # files
-        else:
-            raise Exception('ERROR: %s does not exist' % p)
-
-        images = [x for x in files if os.path.splitext(x)[-1].lower() in img_formats]
-        ni = len(images)
-
-        self.img_size = img_size
-        self.files = images
-        self.nf = ni  # number of files
-        self.mode = 'images'
-        
-        assert self.nf > 0, 'No images or videos found in %s. Supported formats are:\nimages: %s\nvideos: %s' % \
-                            (p, img_formats, vid_formats)
-
-    def __iter__(self):
-        self.count = 0
-        return self
-    
-    def __len__(self):
-        return self.nf  # number of files
-
-    def __next__(self):
-        if self.count == self.nf:
-            raise StopIteration
-        path = self.files[self.count]
-
-        # Read image
-        self.count += 1
-        try:
-            img_np = cv2.imread(path)  # BGR
-            assert img_np is not None, 'Image Not Found ' + path
-        except Exception as e:
-            print(e)
-            return None
-
-        print('image %g/%g %s: ' % (self.count, self.nf, path))
-        return path, img_np
-
 
 class LoadImages:  # for inference
     def __init__(self, path, img_size=640):
