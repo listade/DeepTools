@@ -1,5 +1,7 @@
 
-Install dependencies
+This project is fork https://github.com/ultralytics/yolov5
+
+Install
 ```
   $ pip install torch torchvision torchaudio --extra-index-url https://download.pytorch.org/whl/cu116
   $ pip install git+https://github.com/JunnYu/mish-cuda
@@ -10,14 +12,4 @@ Install dependencies
 Check CUDA
 ```
   $ python -c "import torch;print(torch.cuda.is_available())"
-```
-
-Run detection
-```
-  $ python -m detect.detect
-```
-
-Run segmentation
-```
-  $ python -m segment.detect
 ```
