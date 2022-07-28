@@ -1,3 +1,5 @@
+"""Semantic segmentation inference module"""
+
 import argparse
 import glob
 import os
@@ -13,6 +15,7 @@ from .model import SegModel
 
 
 class ImagesDataset(Dataset):
+    """Dataset of numpy images"""
 
     def __init__(self, path="."):
         mask = os.path.join(path, "*.jpg")
@@ -31,10 +34,11 @@ class ImagesDataset(Dataset):
         return len(self.files)
 
 
-def detect(opt):
+def main(opt):
+    """Module entry point"""
+
     device = torch.device(opt.device)
     state_dict = torch.load(opt.weights)
-
     model = SegModel(opt.arch,
                      opt.encoder,
                      in_channels=3,
@@ -108,6 +112,4 @@ if __name__ == "__main__":
     parser.add_argument("--shrink", type=float, default=0.85, metavar="<0-1.0>")
     parser.add_argument("--conf-thres", type=float, default=0.5, metavar="<0-1.0>")
 
-    opt = parser.parse_args()
-
-    detect(opt)
+    main(parser.parse_args())

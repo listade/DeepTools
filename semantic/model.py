@@ -1,3 +1,5 @@
+"""Semantic segmentation module"""
+
 import pytorch_lightning as pl
 import segmentation_models_pytorch as smp
 import albumentations as albu
@@ -5,6 +7,8 @@ import torch
 
 
 class SegModel(pl.LightningModule):
+    """Semantic segmentation model"""
+
     def __init__(self, arch, encoder_name, in_channels, out_classes, **kwargs):
         super().__init__()
         self.model = smp.create_model(arch,
@@ -160,7 +164,7 @@ def get_validation_augmentation():
     return albu.Compose(test_transform)
 
 
-def to_tensor(x, **kwargs):
+def to_tensor(x, _):
     """Tensor"""
     return x.transpose(2, 0, 1).astype('float32')
 

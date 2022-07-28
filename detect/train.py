@@ -1,3 +1,5 @@
+"""YOLO train module"""
+
 import argparse
 import math
 import os
@@ -20,12 +22,14 @@ from tqdm import tqdm
 from . import test  # import test.py to get mAP after each epoch
 from .models.yolo import Model
 from .utils.datasets import create_dataloader
-from .utils.general import (
-    check_img_size, torch_distributed_zero_first, labels_to_class_weights, plot_labels, check_anchors,
-    labels_to_image_weights, compute_loss, plot_images, fitness, strip_optimizer, plot_results,
-    get_latest_run, check_git_status, check_file, increment_dir, print_mutation, plot_evolution)
-
-from .utils.torch_utils import init_seeds, ModelEMA, select_device, intersect_dicts
+from .utils.general import (check_anchors, check_file, check_git_status,
+                            check_img_size, compute_loss, fitness,
+                            get_latest_run, increment_dir,
+                            labels_to_class_weights, labels_to_image_weights,
+                            plot_evolution, plot_images, plot_labels,
+                            plot_results, print_mutation, strip_optimizer)
+from .utils.torch_utils import (ModelEMA, init_seeds, intersect_dicts,
+                                select_device)
 
 
 def train(hyp, opt, device, tb_writer=None):

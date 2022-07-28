@@ -1,3 +1,5 @@
+"""Semantic inference training module"""
+
 import argparse
 import glob
 import os
@@ -20,6 +22,7 @@ warnings.filterwarnings("ignore", category=DeprecationWarning)
 
 
 class Dataset(IterableDataset):
+    """Iterable image dataset with tilling"""
 
     def __init__(self, path=".",
                        width=640,
@@ -78,8 +81,12 @@ class Dataset(IterableDataset):
 
                     yield sample
 
+    def __getitem__(self, _):
+        raise NotImplementedError()
 
-def train(opt):
+
+def main(opt):
+    """Module entry point"""
 
     train_dataset = Dataset(path=opt.train,
                             width=opt.img_size,
@@ -152,6 +159,4 @@ if __name__ == "__main__":
     parser.add_argument("--fill", type=float, default=0.05, metavar="<0-1.0>")
     parser.add_argument("--workers", type=int, default=4, metavar="<int>")
 
-    opt = parser.parse_args()
-
-    train(opt)
+    main(parser.parse_args())
