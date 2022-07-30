@@ -3,26 +3,24 @@ import math
 import os
 import random
 import shutil
-import subprocess
 import time
 from contextlib import contextmanager
 from copy import copy
 from pathlib import Path
-from sys import platform
 
 import cv2
 import matplotlib
 import matplotlib.pyplot as plt
 import numpy as np
 import torch
-import torch.nn as nn
 import torchvision
 import yaml
 from scipy.cluster.vq import kmeans
 from scipy.signal import butter, filtfilt
+from torch import nn
 from tqdm import tqdm
 
-from .torch_utils import init_seeds, is_parallel
+from .torch_utils import is_parallel
 
 # Set printoptions
 torch.set_printoptions(linewidth=320, precision=5, profile='long')
@@ -34,10 +32,9 @@ cv2.setNumThreads(0)
 
 
 @contextmanager
-def torch_distributed_zero_first(local_rank: int):
-    """
-    Decorator to make all processes in distributed training wait for each local_master to do something.
-    """
+def torch_distributed_zero_first(local_rank):
+    """Wait distributed training for each local_master"""
+
     if local_rank not in [-1, 0]:
         torch.distributed.barrier()
     yield
@@ -45,38 +42,28 @@ def torch_distributed_zero_first(local_rank: int):
         torch.distributed.barrier()
 
 
-def init_seeds(seed=0):
-    random.seed(seed)
-    np.random.seed(seed)
-    init_seeds(seed=seed)
+def get_latest_run(path='./runs'):
+    """Return path to most recent 'last.pt' in /runs (i.e. to --resume from)"""
 
-
-def get_latest_run(search_dir='./runs'):
-    # Return path to most recent 'last.pt' in /runs (i.e. to --resume from)
-    last_list = glob.glob(f'{search_dir}/**/last*.pt', recursive=True)
+    last_list = glob.glob(f'{path}/**/last*.pt', recursive=True)
     return max(last_list, key=os.path.getctime)
 
 
-def check_git_status():
-    # Suggest 'git pull' if repo is out of date
-    if platform in ['linux', 'darwin'] and not os.path.isfile('/.dockerenv'):
-        s = subprocess.check_output('if [ -d .git ]; then git fetch && git status -uno; fi', shell=True).decode('utf-8')
-        if 'Your branch is behind' in s:
-            print(s[s.find('Your branch is behind'):s.find('\n\n')] + '\n')
+def check_img_size(img_size, stride=32):
+    """Verify img_size is a multiple of stride s"""
 
-
-def check_img_size(img_size, s=32):
-    # Verify img_size is a multiple of stride s
-    new_size = make_divisible(img_size, int(s))  # ceil gs-multiple
+    new_size = make_divisible(img_size, int(stride))  # ceil gs-multiple
     if new_size != img_size:
-        print('WARNING: --img-size %g must be multiple of max stride %g, updating to %g' % (img_size, s, new_size))
+        args = (img_size, stride, new_size)
+        print('WARNING: --img-size %g must be multiple of max stride %g, updating to %g' % args)
     return new_size
 
 
 def check_anchors(dataset, model, thr=4.0, imgsz=640):
-    # Check anchor fit to data, recompute if necessary
-    print('\nAnalyzing anchors... ', end='')
-    m = model.module.model[-1] if hasattr(model, 'module') else model.model[-1]  # Detect()
+    """Check anchor fit to data, recompute if necessary"""
+
+    print("Analyzing anchors... ", end="")
+    m = model.module.model[-1] if hasattr(model, "module") else model.model[-1]  # Detect()
     shapes = imgsz * dataset.shapes / dataset.shapes.max(1, keepdims=True)
     scale = np.random.uniform(0.9, 1.1, size=(shapes.shape[0], 1))  # augment scale
     wh = torch.tensor(np.concatenate([l[:, 3:5] * s for s, l in zip(shapes * scale, dataset.labels)])).float()  # wh
@@ -90,9 +77,10 @@ def check_anchors(dataset, model, thr=4.0, imgsz=640):
         return bpr, aat
 
     bpr, aat = metric(m.anchor_grid.clone().cpu().view(-1, 2))
-    print('anchors/target = %.2f, Best Possible Recall (BPR) = %.4f' % (aat, bpr), end='')
+    print("anchors/target = %.2f, Best Possible Recall (BPR) = %.4f" % (aat, bpr), end="")
+
     if bpr < 0.98:  # threshold to recompute
-        print('. Attempting to generate improved anchors, please wait...' % bpr)
+        print(". Attempting to generate improved anchors, please wait..." % bpr)
         na = m.anchor_grid.numel() // 2  # number of anchors
         new_anchors = kmean_anchors(dataset, n=na, img_size=imgsz, thr=thr, gen=1000, verbose=False)
         new_bpr = metric(new_anchors.reshape(-1, 2))[0]
@@ -101,14 +89,15 @@ def check_anchors(dataset, model, thr=4.0, imgsz=640):
             m.anchor_grid[:] = new_anchors.clone().view_as(m.anchor_grid)  # for inference
             m.anchors[:] = new_anchors.clone().view_as(m.anchors) / m.stride.to(m.anchors.device).view(-1, 1, 1)  # loss
             check_anchor_order(m)
-            print('New anchors saved to model. Update model *.yaml to use these anchors in the future.')
+            print("New anchors saved to model. Update model *.yaml to use these anchors in the future.")
         else:
-            print('Original anchors better than new anchors. Proceeding with original anchors.')
-    print('')  # newline
+            print("Original anchors better than new anchors. Proceeding with original anchors.")
 
 
 def check_anchor_order(m):
-    # Check anchor order against stride order for YOLO Detect() module m, and correct if necessary
+    """Check anchor order against stride order for YOLO Detect() module m,
+       and correct if necessary"""
+
     a = m.anchor_grid.prod(-1).view(-1)  # anchor area
     da = a[-1] - a[0]  # delta a
     ds = m.stride[-1] - m.stride[0]  # delta s
@@ -118,59 +107,47 @@ def check_anchor_order(m):
         m.anchor_grid[:] = m.anchor_grid.flip(0)
 
 
-def check_file(file):
-    # Searches for file if not found locally
-    if os.path.isfile(file) or file == '':
+def find_file(file):
+    """Searches for file if not found locally"""
+
+    if os.path.isfile(file):
         return file
-    else:
-        files = glob.glob('./**/' + file, recursive=True)  # find file
-        assert len(files), 'File Not Found: %s' % file  # assert file was found
-        return files[0]  # return first file if multiple found
+    files = glob.glob('./**/' + file, recursive=True)  # find file
+    if len(files) == 0:
+        raise FileNotFoundError()
+    return files[0]  # return first file if multiple found
 
 
 def make_divisible(x, divisor):
-    # Returns x evenly divisble by divisor
+    """Returns x evenly divisble by divisor"""
+
     return math.ceil(x / divisor) * divisor
 
 
 def labels_to_class_weights(labels, nc=80):
-    # Get class weights (inverse frequency) from training labels
+    """Get class weights (inverse frequency) from training labels"""
+
     if labels[0] is None:  # no labels loaded
         return torch.Tensor()
 
     labels = np.concatenate(labels, 0)  # labels.shape = (866643, 5) for COCO
     classes = labels[:, 0].astype(np.int)  # labels = [class xywh]
     weights = np.bincount(classes, minlength=nc)  # occurences per class
-
-    # Prepend gridpoint count (for uCE trianing)
-    # gpi = ((320 / 32 * np.array([1, 2, 4])) ** 2 * 3).sum()  # gridpoints per image
-    # weights = np.hstack([gpi * len(labels)  - weights.sum() * 9, weights * 9]) ** 0.5  # prepend gridpoints to start
-
     weights[weights == 0] = 1  # replace empty bins with 1
     weights = 1 / weights  # number of targets per class
     weights /= weights.sum()  # normalize
+
     return torch.from_numpy(weights)
 
 
 def labels_to_image_weights(labels, nc=80, class_weights=np.ones(80)):
-    # Produces image weights based on class mAPs
+    """Produces image weights based on class mAPs"""
+
     n = len(labels)
     class_counts = np.array([np.bincount(labels[i][:, 0].astype(np.int), minlength=nc) for i in range(n)])
     image_weights = (class_weights.reshape(1, nc) * class_counts).sum(1)
-    # index = random.choices(range(n), weights=image_weights, k=1)  # weight image sample
+
     return image_weights
-
-
-def coco80_to_coco91_class():  # converts 80-index (val2014) to 91-index (paper)
-    # https://tech.amikelive.com/node-718/what-object-categories-labels-are-in-coco-dataset/
-    # a = np.loadtxt('data/coco.names', dtype='str', delimiter='\n')
-    # b = np.loadtxt('data/coco_paper.names', dtype='str', delimiter='\n')
-    # x1 = [list(a[i] == b).index(True) + 1 for i in range(80)]  # darknet to coco
-    # x2 = [list(b[i] == a).index(True) if any(b[i] == a) else None for i in range(91)]  # coco to darknet
-    x = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 27, 28, 31, 32, 33, 34,
-         35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63,
-         64, 65, 67, 70, 72, 73, 74, 75, 76, 77, 78, 79, 80, 81, 82, 84, 85, 86, 87, 88, 89, 90]
-    return x
 
 
 def xyxy2xywh(x):

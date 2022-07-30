@@ -22,12 +22,12 @@ from tqdm import tqdm
 from . import test  # import test.py to get mAP after each epoch
 from .models.yolo import Model
 from .utils.datasets import create_dataloader
-from .utils.general import (check_anchors, check_file, check_git_status,
-                            check_img_size, compute_loss, fitness,
-                            get_latest_run, increment_dir,
-                            labels_to_class_weights, labels_to_image_weights,
-                            plot_evolution, plot_images, plot_labels,
-                            plot_results, print_mutation, strip_optimizer)
+from .utils.general import (check_anchors, find_file, check_img_size,
+                            compute_loss, fitness, get_latest_run,
+                            increment_dir, labels_to_class_weights,
+                            labels_to_image_weights, plot_evolution,
+                            plot_images, plot_labels, plot_results,
+                            print_mutation, strip_optimizer)
 from .utils.torch_utils import (ModelEMA, init_seeds, intersect_dicts,
                                 select_device)
 
@@ -407,11 +407,9 @@ if __name__ == '__main__':
         if last and not opt.weights:
             print(f'Resuming training from {last}')
         opt.weights = last if opt.resume and not opt.weights else opt.weights
-    if opt.local_rank == -1 or ("RANK" in os.environ and os.environ["RANK"] == "0"):
-        check_git_status()
 
     opt.hyp = opt.hyp or ('data/hyp.finetune.yaml' if opt.weights else 'data/hyp.scratch.yaml')
-    opt.data, opt.cfg, opt.hyp = check_file(opt.data), check_file(opt.cfg), check_file(opt.hyp)  # check files
+    opt.data, opt.cfg, opt.hyp = find_file(opt.data), find_file(opt.cfg), find_file(opt.hyp)  # check files
     assert len(opt.cfg) or len(opt.weights), 'either --cfg or --weights must be specified'
 
     opt.img_size.extend([opt.img_size[-1]] * (2 - len(opt.img_size)))  # extend to 2 sizes (train, test)
