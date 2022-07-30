@@ -64,7 +64,7 @@ def main(opt):
                 if im_tile.ndimension() == 3:
                     im_tile = im_tile.unsqueeze(0)
 
-                res = infer(im_tile, augment=False)
+                res = infer(im_tile, augment=opt.augment)
                 pred = res[0]
                 nms_pred = non_max_suppression(pred,
                                                conf_thres=opt.conf_thres,
@@ -112,6 +112,7 @@ if __name__ == "__main__":
     parser.add_argument("--img-size", type=int, default=640, metavar="<px>")
     parser.add_argument("--overlap", type=int, default=100, metavar="<px>")
 
+    parser.add_argument("--augment", action="store_true")
     parser.add_argument("--save-img", action="store_true")
 
     main(parser.parse_args())

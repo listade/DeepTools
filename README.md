@@ -17,7 +17,7 @@
   ```
   Segmentation inference
   ```
-    $ python -m semantic.segment --input ./images --weights ./weights.ckpt
+    $ python -m semantic.inference --input ./images --weights ./weights.ckpt
   ```
   Images cropping
   ```
@@ -33,7 +33,7 @@
   ```
   Detection inference
   ```
-    $ python -m detect.detect --input ./images --output ./labels --weights ./weights.pt --save-img
+    $ python -m detect.inference --input ./images --output ./labels --weights ./weights.pt --save-img
   ```
 
 The project is fork https://github.com/ultralytics/yolov5
