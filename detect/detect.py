@@ -7,11 +7,12 @@ import warnings
 
 import cv2
 import numpy as np
+import tiler
 import torch
 from torch.utils.data import Dataset
 from torchvision.ops import nms
 
-from .utils.general import non_max_suppression, plot_one_box, scale_coords
+from .utils.general import non_max_suppression, plot_one_box
 
 warnings.filterwarnings("ignore", category=UserWarning)
 
@@ -43,91 +44,58 @@ def main(opt):
     dataset = ImagesDataset(opt.input)
 
     with torch.no_grad():
-        model = torch.load(opt.weights, map_location=device)
-        model = model["model"].float().fuse().eval()  # load FP32 model
+        weights = torch.load(opt.weights, map_location=device)
+        model = weights["model"]
+        infer = model.float().fuse().eval()  # load FP32 model
 
         for path, img_np in dataset:
-            im_height, im_width = img_np.shape[:-1]
-            preds = torch.zeros((0, 6), dtype=torch.float32).to(device)
+            total = torch.zeros((0,6), dtype=torch.float32).to(device)
+            img_np = img_np.transpose(2,0,1)  # HWC -> CHW
+            tiler_obj = tiler.Tiler(data_shape=img_np.shape,
+                                    tile_shape=(3, opt.img_size, opt.img_size),
+                                    channel_dimension=0,
+                                    overlap=opt.overlap)
+            tiles = tiler_obj(img_np)
+            for i, im_tile in tiles:
+                im_tile = np.ascontiguousarray(im_tile)
+                im_tile = torch.from_numpy(im_tile).float().to(device)
+                im_tile /= 255.0 # 0-255 to 0.0-1.0
+                if im_tile.ndimension() == 3:
+                    im_tile = im_tile.unsqueeze(0)
 
-            for hstep in range(0, im_height, opt.img_size-opt.overlap):
-                for wstep in range(0, im_width, opt.img_size-opt.overlap):
-                    im_tile = img_np[hstep:hstep+opt.img_size, wstep:wstep+opt.img_size, :] # tile
-                    tile_height, tile_width = im_tile.shape[:-1]
-
-                    if tile_width < opt.img_size and tile_height == opt.img_size:
-                        im_tile = np.pad(im_tile,
-                                         [
-                                            (0, 0),
-                                            (0, opt.img_size-tile_width),
-                                            (0, 0)
-                                         ],
-                                         mode="constant",
-                                         constant_values=114)
-                    elif tile_height < opt.img_size and tile_width == opt.img_size:
-                        im_tile = np.pad(im_tile,
-                                         [
-                                            (0, opt.img_size-tile_height),
-                                            (0, 0),
-                                            (0, 0)
-                                         ],
-                                         mode="constant",
-                                         constant_values=114)
-                    elif tile_width < opt.img_size and tile_height < opt.img_size:
-                        im_tile = np.pad(im_tile,
-                                         [
-                                            (0, opt.img_size-tile_height),
-                                            (0, opt.img_size-tile_width),
-                                            (0, 0)
-                                         ],
-                                         mode="constant",
-                                         constant_values=114)
-                    elif tile_width > opt.img_size or tile_height > opt.img_size:
-                        raise ValueError("dimension mismatch: cropped image size")
-
-                    init_im_size = im_tile.shape[:-1]  # initial crop size 1024x1024
-                    im_tile = cv2.resize(im_tile, (640, 640))
-                    im_tile = np.ascontiguousarray(im_tile)
-                    im_tile = torch.from_numpy(im_tile).to(device)
-                    im_tile = im_tile.float()  # uint8 to fp16/32
-                    im_tile /= 255.0  # 0 - 255 to 0.0 - 1.0
-                    im_tile = im_tile.permute(2, 0, 1)
-
-                    if im_tile.ndimension() == 3:
-                        im_tile = im_tile.unsqueeze(0)
-
-                    pred = model(im_tile, augment=False)[0]
-                    pred = non_max_suppression(pred,
+                res = infer(im_tile, augment=False)
+                pred = res[0]
+                nms_pred = non_max_suppression(pred,
                                                conf_thres=opt.conf_thres,
                                                iou_thres=opt.iou_thres)
-                    if pred[0] is not None:
-                        # rescaling coordinates from 640 to 1024
-                        pred[0][:, :4] = scale_coords(im_tile.shape[2:], # torch tensor
-                                                      pred[0][:, :4],
-                                                      init_im_size).round()
+                dets = nms_pred[-1]
+                if dets is None:
+                    continue
+                (x,y), _ = tiler_obj.get_tile_bbox(i)
 
-                        # setting bbox coords to the corresponding crop windows
-                        pred[0][:, 0] = pred[0][:, 0] + wstep
-                        pred[0][:, 1] = pred[0][:, 1] + hstep
-                        pred[0][:, 2] = pred[0][:, 2] + wstep
-                        pred[0][:, 3] = pred[0][:, 3] + hstep
+                dets[:,0] = dets[:,0] + y
+                dets[:,1] = dets[:,1] + x
+                dets[:,2] = dets[:,2] + y
+                dets[:,3] = dets[:,3] + x
 
-                        # gathering all coordinates in one tensor
-                        preds = torch.cat((preds, pred[0]), dim=0)
+                total = torch.cat((total, dets), dim=0) # gathering all coordinates in one tensor
 
-            dets = preds[nms(preds[:, :4], iou_threshold=0.1, scores=preds[:, 4])]
-            dets = dets.cpu().numpy()
-            dets[:, [4, 5]] = dets[:, [5, 4]]
+            total = total[nms(total[:,:4], iou_threshold=opt.iou_thres, scores=total[:,4])]
+            np_total = total.cpu().numpy()
+            img_np = img_np.transpose(1,2,0)  # CHW -> HWC
 
-            file = os.path.join(opt.output, os.path.basename(path))
-            fmt = ("%d", "%d", "%d", "%d", "%d", "%1.3f")
+            img = os.path.join(opt.output, os.path.basename(path))
 
-            np.savetxt(file.replace(".jpg", ".txt"), dets, fmt=fmt) # x1 y1 x2 y2 cls score
+            if opt.save_img:
+                for bbox in np_total[:,:4].round():
+                    plot_one_box(bbox, img_np, line_thickness=3)
+                cv2.imwrite(img, img_np)
 
-            for det in dets:
-                plot_one_box(det[:4], img_np, line_thickness=1)
+            ext = img.split(".")[-1]
+            txt = img.replace(ext, "txt")
 
-            cv2.imwrite(file, img_np)
+            np_total[:,[4,5]] = np_total[:,[5,4]] # score cls -> cls score
+            np.savetxt(txt, np_total, fmt=("%d", "%d", "%d", "%d", "%d", "%1.3f"))
 
 
 if __name__ == "__main__":
@@ -141,6 +109,9 @@ if __name__ == "__main__":
     parser.add_argument("--conf-thres", type=float, default=0.5, metavar="<0-1.0>")
     parser.add_argument("--iou-thres", type=float, default=0.1, metavar="<0-1.0>")
     parser.add_argument("--img-size", type=int, default=640, metavar="<px>")
+    parser.add_argument("--batch-size", type=int, default=4, metavar="<int>")
     parser.add_argument("--overlap", type=int, default=100, metavar="<px>")
+
+    parser.add_argument("--save-img", action="store_true")
 
     main(parser.parse_args())
