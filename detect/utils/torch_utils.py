@@ -1,19 +1,21 @@
+"""PyTorch utils module"""
+
 import math
 import os
 import time
 from copy import deepcopy
 
 import torch
-import torch.backends.cudnn as cudnn
-import torch.nn as nn
 import torch.nn.functional as F
-import torchvision.models as models
+from torch import nn
+from torch.backends import cudnn
+from torchvision import models
 
 
 def init_seeds(seed=0):
+    """ Speed-reproducibility tradeoff https://pytorch.org/docs/stable/notes/randomness.html """
     torch.manual_seed(seed)
 
-    # Speed-reproducibility tradeoff https://pytorch.org/docs/stable/notes/randomness.html
     if seed == 0:  # slower, more reproducible
         cudnn.deterministic = True
         cudnn.benchmark = False
@@ -22,31 +24,39 @@ def init_seeds(seed=0):
         cudnn.benchmark = True
 
 
-def select_device(device='', batch_size=None):
-    # device = 'cpu' or '0' or '0,1,2,3'
-    cpu_request = device.lower() == 'cpu'
-    if device and not cpu_request:  # if device requested other than 'cpu'
-        os.environ['CUDA_VISIBLE_DEVICES'] = device  # set environment variable
-        assert torch.cuda.is_available(), 'CUDA unavailable, invalid device %s requested' % device  # check availablity
+def select_device(device, batch_size=1):
+    """Device cpu or cuda"""
 
-    cuda = False if cpu_request else torch.cuda.is_available()
-    if cuda:
-        c = 1024 ** 2  # bytes to MB
-        ng = torch.cuda.device_count()
-        if ng > 1 and batch_size:  # check that batch_size is compatible with device_count
-            assert batch_size % ng == 0, 'batch-size %g not multiple of GPU count %g' % (batch_size, ng)
-        x = [torch.cuda.get_device_properties(i) for i in range(ng)]
-        s = 'Using CUDA '
-        for i in range(0, ng):
-            if i == 1:
-                s = ' ' * len(s)
-            print("%sdevice%g _CudaDeviceProperties(name='%s', total_memory=%dMB)" %
-                  (s, i, x[i].name, x[i].total_memory / c))
-    else:
-        print('Using CPU')
+    if device == "cpu":
+        print(f"Using {device}")
+        return torch.device("cpu")
 
-    print('')  # skip a line
-    return torch.device('cuda:0' if cuda else 'cpu')
+    words = device.split(":")
+    if words[0] != "cuda":
+        raise Exception(f"invalid device: {device}")
+
+    os.environ["CUDA_VISIBLE_DEVICES"] = device
+    if not torch.cuda.is_available():
+        raise Exception("cuda is unavailable")
+
+    device_count = torch.cuda.device_count()
+    props = [torch.cuda.get_device_properties(i) for i in range(device_count)]
+    infos = [f"{v.name} {v.total_memory / (1024 ** 2)}MiB" for v in props]
+
+    if len(words) == 1:
+        if device_count > 1 and device_count % batch_size != 0:
+            raise Exception(f"invalid batch size {batch_size}")
+
+        print("Using", ",".join(infos))
+        return torch.device(device)
+
+    num = words[-1]
+    if int(num) >= device_count:
+        raise Exception(f"invalid device num: {num}")
+
+    print(f"Using {props[num]}")
+    return torch.device(device)
+
 
 
 def time_synchronized():
@@ -142,7 +152,8 @@ def model_info(model, verbose=False):
     except:
         fs = ''
 
-    print('Model Summary: %g layers, %g parameters, %g gradients%s' % (len(list(model.parameters())), n_p, n_g, fs))
+    layers = len(list(model.parameters()))
+    print(f"Model Summary: {layers} layers, {n_p} parameters, {n_g} gradients {fs}")
 
 
 def load_classifier(name='resnet101', n=2):

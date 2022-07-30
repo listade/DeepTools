@@ -12,6 +12,7 @@ import torch
 from torch.utils.data import Dataset
 from torchvision.ops import nms
 
+from .utils.torch_utils import select_device
 from .utils.general import non_max_suppression, plot_one_box
 
 warnings.filterwarnings("ignore", category=UserWarning)
@@ -40,7 +41,7 @@ class ImagesDataset(Dataset):
 def main(opt):
     """Inference running"""
 
-    device = torch.device(opt.device)
+    device = select_device(opt.device)
     dataset = ImagesDataset(opt.input)
 
     with torch.no_grad():

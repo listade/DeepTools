@@ -99,8 +99,8 @@ def main(opt):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
 
-    parser.add_argument("--input", type=str, default="input", metavar="<path-to-images>")
-    parser.add_argument("--output", type=str, default="output", metavar="<path-to-masks>")
+    parser.add_argument("--input", type=str, default=".", metavar="<path-to-images>")
+    parser.add_argument("--output", type=str, default=".", metavar="<path-to-masks>")
     parser.add_argument("--weights", type=str, default="weights.ckpt", metavar="<path-to-*.ckpt>")
     parser.add_argument("--device", type=str, default="cuda", metavar="<cuda|cpu>")
     parser.add_argument("--batch-size", type=int, default=4, metavar="<int>")
