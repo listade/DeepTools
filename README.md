@@ -1,5 +1,5 @@
 
-This project is fork https://github.com/ultralytics/yolov5
+The project is fork https://github.com/ultralytics/yolov5
 
 Install
 ```
