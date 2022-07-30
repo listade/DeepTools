@@ -1,4 +1,4 @@
-"""Semantic segmentation inference module"""
+"""Semantic segmentation module"""
 
 import argparse
 import glob

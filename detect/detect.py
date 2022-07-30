@@ -1,4 +1,4 @@
-"""Object detection main module"""
+"""Object detection module"""
 
 import argparse
 import glob
@@ -109,7 +109,6 @@ if __name__ == "__main__":
     parser.add_argument("--conf-thres", type=float, default=0.5, metavar="<0-1.0>")
     parser.add_argument("--iou-thres", type=float, default=0.1, metavar="<0-1.0>")
     parser.add_argument("--img-size", type=int, default=640, metavar="<px>")
-    parser.add_argument("--batch-size", type=int, default=4, metavar="<int>")
     parser.add_argument("--overlap", type=int, default=100, metavar="<px>")
 
     parser.add_argument("--save-img", action="store_true")
