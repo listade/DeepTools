@@ -60,58 +60,39 @@ def select_device(device, batch_size=1):
 
 
 def time_synchronized():
-    torch.cuda.synchronize() if torch.cuda.is_available() else None
+    """Waits for all kernels in all streams on a CUDA device to complete and return time"""
+
+    if torch.cuda.is_available():
+        torch.cuda.synchronize()
     return time.time()
 
 
 def is_parallel(model):
+    """Is model nn.parallel.DataParallel or nn.parallel.DistributedDataParallel"""
     return type(model) in (nn.parallel.DataParallel, nn.parallel.DistributedDataParallel)
 
 
-def intersect_dicts(da, db, exclude=()):
-    # Dictionary intersection of matching keys and shapes, omitting 'exclude' keys, using da values
-    return {k: v for k, v in da.items() if k in db and not any(x in k for x in exclude) and v.shape == db[k].shape}
+def intersect_dicts(dict_x, dict_y, exclude=()):
+    """Dictionary intersection"""
+    return {k: v for k, v in dict_x.items() \
+           if k in dict_y \
+              and not any(x in k for x in exclude) \
+              and v.shape == dict_y[k].shape}
 
 
 def initialize_weights(model):
-    for m in model.modules():
-        t = type(m)
-        if t is nn.Conv2d:
-            pass  # nn.init.kaiming_normal_(m.weight, mode='fan_out', nonlinearity='relu')
-        elif t is nn.BatchNorm2d:
-            m.eps = 1e-3
-            m.momentum = 0.03
-        elif t in [nn.LeakyReLU, nn.ReLU, nn.ReLU6]:
-            m.inplace = True
-
-
-def find_modules(model, mclass=nn.Conv2d):
-    # Finds layer indices matching module class 'mclass'
-    return [i for i, m in enumerate(model.module_list) if isinstance(m, mclass)]
-
-
-def sparsity(model):
-    # Return global model sparsity
-    a, b = 0., 0.
-    for p in model.parameters():
-        a += p.numel()
-        b += (p == 0).sum()
-    return b / a
-
-
-def prune(model, amount=0.3):
-    # Prune model to requested global sparsity
-    import torch.nn.utils.prune as prune
-    print('Pruning model... ', end='')
-    for name, m in model.named_modules():
-        if isinstance(m, nn.Conv2d):
-            prune.l1_unstructured(m, name='weight', amount=amount)  # prune
-            prune.remove(m, 'weight')  # make permanent
-    print(' %.3g global sparsity' % sparsity(model))
+    """Init modules paramgs"""
+    for module in model.modules():
+        if isinstance(module, nn.BatchNorm2d):
+            module.eps = 1e-3
+            module.momentum = 0.03
+            continue
+        if type(module) in [nn.LeakyReLU, nn.ReLU, nn.ReLU6]:
+            module.inplace = True
 
 
 def fuse_conv_and_bn(conv, bn):
-    # https://tehnokv.com/posts/fusing-batchnorm-and-conv/
+    """https://tehnokv.com/posts/fusing-batchnorm-and-conv/"""
     with torch.no_grad():
         # init
         fusedconv = nn.Conv2d(conv.in_channels,
@@ -120,14 +101,13 @@ def fuse_conv_and_bn(conv, bn):
                               stride=conv.stride,
                               padding=conv.padding,
                               bias=True).to(conv.weight.device)
-
         # prepare filters
         w_conv = conv.weight.clone().view(conv.out_channels, -1)
         w_bn = torch.diag(bn.weight.div(torch.sqrt(bn.eps + bn.running_var)))
         fusedconv.weight.copy_(torch.mm(w_bn, w_conv).view(fusedconv.weight.size()))
 
         # prepare spatial bias
-        b_conv = torch.zeros(conv.weight.size(0), device=conv.weight.device) if conv.bias is None else conv.bias
+        b_conv = conv.bias or torch.zeros(conv.weight.size(0), device=conv.weight.device)
         b_bn = bn.bias - bn.weight.mul(bn.running_mean).div(torch.sqrt(bn.running_var + bn.eps))
         fusedconv.bias.copy_(torch.mm(w_bn, b_conv.reshape(-1, 1)).reshape(-1) + b_bn)
 
