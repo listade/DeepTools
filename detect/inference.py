@@ -82,8 +82,11 @@ def main(opt):
                 # gathering all coordinates in one tensor
                 total = torch.cat((total, dets), dim=0)
 
-            total = total[nms(
-                total[:, :4], iou_threshold=opt.iou_thres, scores=total[:, 4])]
+            nms_map = nms(total[:, :4],
+                          iou_threshold=opt.iou_thres,
+                          scores=total[:, 4])
+            total = total[nms_map]
+
             np_total = total.cpu().numpy()
             img_np = img_np.transpose(1, 2, 0)  # CHW -> HWC
 
@@ -108,21 +111,45 @@ def main(opt):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
 
-    parser.add_argument("--input", type=str, default="input",
+    parser.add_argument("--input",
+                        type=str,
+                        required=True,
                         metavar="<path-to-images>")
-    parser.add_argument("--output", type=str,
-                        default="output", metavar="<path-to-txt>")
-    parser.add_argument("--weights", type=str,
-                        default="yolov4-p5.pt", metavar="<path-to-*.pt>")
-    parser.add_argument("--device", type=str,
-                        default="cuda", metavar="<cuda|cpu>")
 
-    parser.add_argument("--conf-thres", type=float,
-                        default=0.5, metavar="<0-1.0>")
-    parser.add_argument("--iou-thres", type=float,
-                        default=0.1, metavar="<0-1.0>")
-    parser.add_argument("--img-size", type=int, default=640, metavar="<px>")
-    parser.add_argument("--overlap", type=int, default=100, metavar="<px>")
+    parser.add_argument("--output",
+                        type=str,
+                        default=".",
+                        metavar="<path-to-txt>")
+
+    parser.add_argument("--weights",
+                        type=str,
+                        required=True,
+                        metavar="<path-to-*.pt>")
+
+    parser.add_argument("--device",
+                        type=str,
+                        default="cuda",
+                        metavar="<cuda|cpu>")
+
+    parser.add_argument("--conf-thres",
+                        type=float,
+                        default=0.5,
+                        metavar="<0-1.0>")
+
+    parser.add_argument("--iou-thres",
+                        type=float,
+                        default=0.1,
+                        metavar="<0-1.0>")
+
+    parser.add_argument("--img-size",
+                        type=int,
+                        default=640,
+                        metavar="<px>")
+
+    parser.add_argument("--overlap",
+                        type=int,
+                        default=100,
+                        metavar="<px>")
 
     parser.add_argument("--augment", action="store_true")
     parser.add_argument("--save-img", action="store_true")
