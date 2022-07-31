@@ -34,7 +34,7 @@ def xy_to_lonlat(x, y, width, heigth, clon, clat, m_px, yaw=.0):
     mx = x * m_px + m_ox
     my = y * m_px + m_oy
 
-    lon, lat =  pyproj.transform(merc, epsg, mx, my)
+    lon, lat = pyproj.transform(merc, epsg, mx, my)
 
     return lon, lat
 
@@ -110,7 +110,7 @@ def merge_two_images(im_dst, im_src, im_out, x=0, y=0, rad=.0):
     x1 = x0 + w
     y1 = y0 + h
 
-    np_dst[y0:y1,x0:x1] += np_src
+    np_dst[y0:y1, x0:x1] += np_src
 
     cv2.imwrite(im_out, np_dst)
 
@@ -121,14 +121,21 @@ def draw_bbox(im_np, x, y, w, h, rad=0, color=(0, 255, 0), line_thickness=5):
     x0 = x - w // 2
     y0 = y - h // 2
 
-    x1 = x0 + w; y1 = y0
-    x2 = x1; y2 = y0 + h
+    x1 = x0 + w
+    y1 = y0
+    x2 = x1
+    y2 = y0 + h
 
-    x3 = x0; y3 = y2
-    x0 -= x; y0 -= y
-    x1 -= x; y1 -= y
-    x2 -= x; y2 -= y
-    x3 -= x; y3 -= y
+    x3 = x0
+    y3 = y2
+    x0 -= x
+    y0 -= y
+    x1 -= x
+    y1 -= y
+    x2 -= x
+    y2 -= y
+    x3 -= x
+    y3 -= y
 
     rad = np.deg2rad(rad)
 
@@ -137,13 +144,19 @@ def draw_bbox(im_np, x, y, w, h, rad=0, color=(0, 255, 0), line_thickness=5):
     x2, y2 = rotate(x2, y2, rad)
     x3, y3 = rotate(x3, y3, rad)
 
-    x0 += x; y0 += y
-    x1 += x; y1 += y
-    x2 += x; y2 += y
-    x3 += x; y3 += y
+    x0 += x
+    y0 += y
+    x1 += x
+    y1 += y
+    x2 += x
+    y2 += y
+    x3 += x
+    y3 += y
 
-    p0 = (x0, y0); p1 = (x1, y1)
-    p2 = (x2, y2); p3 = (x3, y3)
+    p0 = (x0, y0)
+    p1 = (x1, y1)
+    p2 = (x2, y2)
+    p3 = (x3, y3)
 
     cv2.line(im_np, p0, p1, color, thickness=line_thickness)
     cv2.line(im_np, p1, p2, color, thickness=line_thickness)
@@ -163,6 +176,7 @@ def countours_and_bboxes(src_path):
 
         yield contour.squeeze(), (x, y, w, h)
 
+
 def contour_center(cnt):
     """Returns (x, y) of contour center"""
 
@@ -178,7 +192,7 @@ def create_mask(src_img, dst_img, polys):
     """Generate image grayscale mask"""
 
     im_src = cv2.imread(src_img)
-    im_mask = np.zeros_like(im_src[:,:,0])
+    im_mask = np.zeros_like(im_src[:, :, 0])
 
     for p in polys:
         im_mask = cv2.fillPoly(im_mask, np.array([p]), color=(255, 255, 255))

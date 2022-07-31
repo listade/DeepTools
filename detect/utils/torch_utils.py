@@ -15,10 +15,10 @@ def init_seeds(seed=0):
     """Speed-reproducibility tradeoff https://pytorch.org/docs/stable/notes/randomness.html"""
 
     torch.manual_seed(seed)
-    if seed == 0: # slower, more reproducible
+    if seed == 0:  # slower, more reproducible
         cudnn.deterministic = True
         cudnn.benchmark = False
-    else: # faster, less reproducible
+    else:  # faster, less reproducible
         cudnn.deterministic = False
         cudnn.benchmark = True
 
@@ -57,7 +57,6 @@ def select_device(device, batch_size=1):
     return torch.device(device)
 
 
-
 def time_synchronized():
     """Waits for all kernels in all streams on a CUDA device to complete and return time"""
 
@@ -74,10 +73,10 @@ def is_parallel(model):
 def intersect_dicts(dict_x, dict_y, exclude=()):
     """Dictionary intersection"""
 
-    return {k: v for k, v in dict_x.items() \
-           if k in dict_y \
-              and not any(x in k for x in exclude) \
-              and v.shape == dict_y[k].shape}
+    return {k: v for k, v in dict_x.items()
+            if k in dict_y
+            and not any(x in k for x in exclude)
+            and v.shape == dict_y[k].shape}
 
 
 def initialize_weights(model):
@@ -106,12 +105,17 @@ def fuse_conv_and_bn(conv, bn):
         # prepare filters
         w_conv = conv.weight.clone().view(conv.out_channels, -1)
         w_bn = torch.diag(bn.weight.div(torch.sqrt(bn.eps + bn.running_var)))
-        fusedconv.weight.copy_(torch.mm(w_bn, w_conv).view(fusedconv.weight.size()))
+        fusedconv.weight.copy_(
+            torch.mm(w_bn, w_conv).view(fusedconv.weight.size()))
 
         # prepare spatial bias
-        b_conv = conv.bias or torch.zeros(conv.weight.size(0), device=conv.weight.device)
-        b_bn = bn.bias - bn.weight.mul(bn.running_mean).div(torch.sqrt(bn.running_var + bn.eps))
-        fusedconv.bias.copy_(torch.mm(w_bn, b_conv.reshape(-1, 1)).reshape(-1) + b_bn)
+        b_conv = conv.bias or torch.zeros(
+            conv.weight.size(0), device=conv.weight.device)
+        b_bn = bn.bias - \
+            bn.weight.mul(bn.running_mean).div(
+                torch.sqrt(bn.running_var + bn.eps))
+        fusedconv.bias.copy_(
+            torch.mm(w_bn, b_conv.reshape(-1, 1)).reshape(-1) + b_bn)
 
         return fusedconv
 
@@ -120,19 +124,22 @@ def model_info(model, verbose=False):
     """Plots a line-by-line description of a PyTorch model"""
 
     n_p = sum(x.numel() for x in model.parameters())  # number parameters
-    n_g = sum(x.numel() for x in model.parameters() if x.requires_grad)  # number gradients
+    n_g = sum(x.numel() for x in model.parameters()
+              if x.requires_grad)  # number gradients
 
     layers = len(list(model.parameters()))
     print(f"Model Summary: {layers} layers, {n_p} parameters, {n_g} gradients")
 
     if verbose:
-        header = ("layer", "name", "gradient", "parameters", "shape", "mu", "sigma")
+        header = ("layer", "name", "gradient",
+                  "parameters", "shape", "mu", "sigma")
         print("%5s %40s %9s %12s %20s %10s %10s" % header)
 
         params = model.named_parameters()
         for i, (name, p) in enumerate(params):
             name = name.replace("module_list.", "")
-            values = (i, name, p.requires_grad, p.numel(), list(p.shape), p.mean(), p.std())
+            values = (i, name, p.requires_grad, p.numel(),
+                      list(p.shape), p.mean(), p.std())
             print("%5g %40s %9s %12g %20s %10.3g %10.3g" % values)
 
 
@@ -143,12 +150,14 @@ def scale_img(img, ratio=1.0, same_shape=False):  # img(16,3,256,416), r=ratio
         return img
     h, w = img.shape[2:]
     s = (int(h * ratio), int(w * ratio))  # new size
-    img = F.interpolate(img, size=s, mode='bilinear', align_corners=False)  # resize
+    img = F.interpolate(img, size=s, mode='bilinear',
+                        align_corners=False)  # resize
     if not same_shape:  # pad/crop img
-        gs = 128#64#32  # (pixels) grid size
+        gs = 128  # 64#32  # (pixels) grid size
         h, w = [math.ceil(x * ratio / gs) * gs for x in (h, w)]
 
-    return F.pad(img, [0, w - s[1], 0, h - s[0]], value=0.447)  # value = imagenet mean
+    # value = imagenet mean
+    return F.pad(img, [0, w - s[1], 0, h - s[0]], value=0.447)
 
 
 class ModelEMA:
@@ -162,7 +171,8 @@ class ModelEMA:
 
     def __init__(self, model, decay=0.9999, updates=0):
         # create EMA
-        self.ema = deepcopy(model.module if is_parallel(model) else model).eval() # FP32 EMA
+        self.ema = deepcopy(model.module if is_parallel(
+            model) else model).eval()  # FP32 EMA
         self.updates = updates  # number of EMA updates
         # decay exponential ramp (to help early epochs)
         self.decay = lambda x: decay * (1 - math.exp(-x / 2000))

@@ -25,13 +25,13 @@ class Dataset(IterableDataset):
     """Iterable image dataset with tilling"""
 
     def __init__(self, path=".",
-                       width=640,
-                       overlap=100,
-                       shrink=0.85,
-                       fill=0.05,
-                       encoder="resnext50_32x4d",
-                       encoder_weights="imagenet",
-                       augment=None):
+                 width=640,
+                 overlap=100,
+                 shrink=0.85,
+                 fill=0.05,
+                 encoder="resnext50_32x4d",
+                 encoder_weights="imagenet",
+                 augment=None):
 
         mask = os.path.join(path, "*.jpg")
         prep_fn = smp.encoders.get_preprocessing_fn(encoder, encoder_weights)
@@ -48,13 +48,15 @@ class Dataset(IterableDataset):
         for _, path in enumerate(self.files):
             img = cv2.imread(path)
             img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-            img = cv2.resize(img, None, fx=self.shrink,fy=self.shrink, interpolation=cv2.INTER_AREA)
+            img = cv2.resize(img, None, fx=self.shrink,
+                             fy=self.shrink, interpolation=cv2.INTER_AREA)
 
             mask = path.replace(".jpg", ".png")
 
             msk = cv2.imread(mask)
             msk = cv2.cvtColor(msk, cv2.COLOR_BGR2RGB)
-            msk = cv2.resize(msk, None, fx=self.shrink,fy=self.shrink, interpolation=cv2.INTER_AREA)
+            msk = cv2.resize(msk, None, fx=self.shrink,
+                             fy=self.shrink, interpolation=cv2.INTER_AREA)
 
             msk = (msk > 0).astype(np.uint8)*255
             alpha = np.dstack((img, msk))
@@ -65,11 +67,11 @@ class Dataset(IterableDataset):
                           overlap=self.overlap)
 
             for _, arr in tiler(alpha):
-                tile_area = arr[:,:,-1].sum()
+                tile_area = arr[:, :, -1].sum()
 
                 if (tile_area / self.width**2) >= self.fill:
-                    img_tile = arr[:,:,:3]
-                    msk_tile = arr[:,:,-1]
+                    img_tile = arr[:, :, :3]
+                    msk_tile = arr[:, :, -1]
                     msk_tile[msk_tile > 0] = 1
                     msk_tile = np.expand_dims(msk_tile, axis=-1)
 
@@ -143,19 +145,26 @@ def main(opt):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
 
-    parser.add_argument("--train", type=str, default="train", metavar="<path-to-images>")
-    parser.add_argument("--valid", type=str, default="valid", metavar="<path-to-images>")
+    parser.add_argument("--train", type=str, default="train",
+                        metavar="<path-to-images>")
+    parser.add_argument("--valid", type=str, default="valid",
+                        metavar="<path-to-images>")
     parser.add_argument("--nc", type=int, default=1, metavar="<classes>")
     parser.add_argument("--name", type=str, default="weights", metavar="<str>")
     parser.add_argument("--batch-size", type=int, default=4, metavar="<int>")
-    parser.add_argument("--device", type=str, default="cuda", metavar="<cuda|cpu>")
+    parser.add_argument("--device", type=str,
+                        default="cuda", metavar="<cuda|cpu>")
     parser.add_argument("--epochs", type=int, default=300, metavar="<int>")
-    parser.add_argument("--arch", type=str, default="UnetPlusPlus", metavar="<str>")
-    parser.add_argument("--encoder", type=str, default="resnext50_32x4d", metavar="<str>")
-    parser.add_argument("--encoder-weights", type=str, default="imagenet", metavar="<str>")
+    parser.add_argument("--arch", type=str,
+                        default="UnetPlusPlus", metavar="<str>")
+    parser.add_argument("--encoder", type=str,
+                        default="resnext50_32x4d", metavar="<str>")
+    parser.add_argument("--encoder-weights", type=str,
+                        default="imagenet", metavar="<str>")
     parser.add_argument("--img-size", type=int, default=640, metavar="<px>")
     parser.add_argument("--overlap", type=int, default=100, metavar="<px>")
-    parser.add_argument("--shrink", type=float, default=0.85, metavar="<0-1.0>")
+    parser.add_argument("--shrink", type=float,
+                        default=0.85, metavar="<0-1.0>")
     parser.add_argument("--fill", type=float, default=0.05, metavar="<0-1.0>")
     parser.add_argument("--workers", type=int, default=4, metavar="<int>")
 

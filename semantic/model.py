@@ -18,11 +18,14 @@ class SegModel(pl.LightningModule):
 
         # preprocessing parameteres for image
         params = smp.encoders.get_preprocessing_params(encoder_name)
-        self.register_buffer("std", torch.tensor(params["std"]).view(1, 3, 1, 1))
-        self.register_buffer("mean", torch.tensor(params["mean"]).view(1, 3, 1, 1))
+        self.register_buffer("std", torch.tensor(
+            params["std"]).view(1, 3, 1, 1))
+        self.register_buffer("mean", torch.tensor(
+            params["mean"]).view(1, 3, 1, 1))
 
         # for image segmentation dice loss could be the best first choice
-        self.loss_fn = smp.losses.DiceLoss(smp.losses.BINARY_MODE, from_logits=True)  
+        self.loss_fn = smp.losses.DiceLoss(
+            smp.losses.BINARY_MODE, from_logits=True)
 
     def forward(self, image):
         # normalize image here
@@ -60,7 +63,7 @@ class SegModel(pl.LightningModule):
         loss = self.loss_fn(logits_mask, mask)
 
         # Lets compute metrics for some threshold
-        # first convert mask values to probabilities, then 
+        # first convert mask values to probabilities, then
         # apply thresholding
         prob_mask = logits_mask.sigmoid()
         pred_mask = (prob_mask > 0.5).float()
@@ -71,7 +74,8 @@ class SegModel(pl.LightningModule):
         # but for now we just compute true positive, false positive, false negative and
         # true negative 'pixels' for each image and class
         # these values will be aggregated in the end of an epoch
-        tp, fp, fn, tn = smp.metrics.get_stats(pred_mask.long(), mask.long(), mode="binary")
+        tp, fp, fn, tn = smp.metrics.get_stats(
+            pred_mask.long(), mask.long(), mode="binary")
 
         return {
             "loss": loss,
@@ -88,14 +92,15 @@ class SegModel(pl.LightningModule):
         fn = torch.cat([x["fn"] for x in outputs])
         tn = torch.cat([x["tn"] for x in outputs])
 
-        # per image IoU means that we first calculate IoU score for each image 
+        # per image IoU means that we first calculate IoU score for each image
         # and then compute mean over these scores
-        per_image_iou = smp.metrics.iou_score(tp, fp, fn, tn, reduction="micro-imagewise")
+        per_image_iou = smp.metrics.iou_score(
+            tp, fp, fn, tn, reduction="micro-imagewise")
 
         # dataset IoU means that we aggregate intersection and union over whole dataset
         # and then compute IoU score. The difference between dataset_iou and per_image_iou scores
-        # in this particular case will not be much, however for dataset 
-        # with "empty" images (images without target class) a large gap could be observed. 
+        # in this particular case will not be much, however for dataset
+        # with "empty" images (images without target class) a large gap could be observed.
         # Empty images influence a lot on per_image_iou and much less on dataset_iou.
         dataset_iou = smp.metrics.iou_score(tp, fp, fn, tn, reduction="micro")
 
@@ -135,7 +140,8 @@ def get_training_augmentation():
         albu.VerticalFlip(p=0.5),
         albu.RandomRotate90(p=0.5),
         albu.Transpose(p=0.5),
-        albu.ShiftScaleRotate(scale_limit=0.05, rotate_limit=(20, 70), border_mode=0, p=0.5),
+        albu.ShiftScaleRotate(scale_limit=0.05, rotate_limit=(
+            20, 70), border_mode=0, p=0.5),
         albu.Perspective(p=0.5),
 
         albu.Compose(

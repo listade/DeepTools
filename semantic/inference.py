@@ -50,7 +50,7 @@ def main(opt):
     with torch.no_grad():
         model.eval()
         prep = smp.encoders.get_preprocessing_fn(encoder_name=opt.encoder,
-                                                pretrained=opt.encoder_weights)
+                                                 pretrained=opt.encoder_weights)
         dataset = ImagesDataset(opt.input)
 
         for image, img_np in dataset:
@@ -61,15 +61,15 @@ def main(opt):
                                  interpolation=cv2.INTER_AREA)
 
             img_res = prep(img_res)
-            img_res = img_res.transpose(2,0,1)  # HWC -> CHW
+            img_res = img_res.transpose(2, 0, 1)  # HWC -> CHW
 
             tiler = Tiler(data_shape=img_res.shape,
-                          tile_shape=(3,opt.img_size,opt.img_size),
+                          tile_shape=(3, opt.img_size, opt.img_size),
                           channel_dimension=0,
                           overlap=opt.overlap)
 
             mtiler = Tiler(data_shape=img_res.shape[1:],
-                           tile_shape=(opt.img_size,opt.img_size),
+                           tile_shape=(opt.img_size, opt.img_size),
                            channel_dimension=None,
                            overlap=opt.overlap)
 
@@ -99,17 +99,26 @@ def main(opt):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
 
-    parser.add_argument("--input", type=str, default=".", metavar="<path-to-images>")
-    parser.add_argument("--output", type=str, default=".", metavar="<path-to-masks>")
-    parser.add_argument("--weights", type=str, default="weights.ckpt", metavar="<path-to-*.ckpt>")
-    parser.add_argument("--device", type=str, default="cuda", metavar="<cuda|cpu>")
+    parser.add_argument("--input", type=str, default=".",
+                        metavar="<path-to-images>")
+    parser.add_argument("--output", type=str, default=".",
+                        metavar="<path-to-masks>")
+    parser.add_argument("--weights", type=str,
+                        default="weights.ckpt", metavar="<path-to-*.ckpt>")
+    parser.add_argument("--device", type=str,
+                        default="cuda", metavar="<cuda|cpu>")
     parser.add_argument("--batch-size", type=int, default=4, metavar="<int>")
-    parser.add_argument("--arch", type=str, default="UnetPlusPlus", metavar="<str>")
-    parser.add_argument("--encoder", type=str, default="resnext50_32x4d", metavar="<str>")
-    parser.add_argument("--encoder-weights", type=str, default="imagenet", metavar="<str>")
+    parser.add_argument("--arch", type=str,
+                        default="UnetPlusPlus", metavar="<str>")
+    parser.add_argument("--encoder", type=str,
+                        default="resnext50_32x4d", metavar="<str>")
+    parser.add_argument("--encoder-weights", type=str,
+                        default="imagenet", metavar="<str>")
     parser.add_argument("--img-size", type=int, default=640, metavar="<px>")
     parser.add_argument("--overlap", type=int, default=100, metavar="<px>")
-    parser.add_argument("--shrink", type=float, default=0.85, metavar="<0-1.0>")
-    parser.add_argument("--conf-thres", type=float, default=0.5, metavar="<0-1.0>")
+    parser.add_argument("--shrink", type=float,
+                        default=0.85, metavar="<0-1.0>")
+    parser.add_argument("--conf-thres", type=float,
+                        default=0.5, metavar="<0-1.0>")
 
     main(parser.parse_args())

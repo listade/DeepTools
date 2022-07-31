@@ -60,7 +60,7 @@ def main(opt):
             for i, im_tile in tiles:
                 im_tile = np.ascontiguousarray(im_tile)
                 im_tile = torch.from_numpy(im_tile).float().to(device)
-                im_tile /= 255.0 # 0-255 to 0.0-1.0
+                im_tile /= 255.0  # 0-255 to 0.0-1.0
                 if im_tile.ndimension() == 3:
                     im_tile = im_tile.unsqueeze(0)
 
@@ -72,18 +72,20 @@ def main(opt):
                 dets = nms_pred[-1]
                 if dets is None:
                     continue
-                (x,y), _ = tiler_obj.get_tile_bbox(i)
+                (x, y), _ = tiler_obj.get_tile_bbox(i)
 
-                dets[:,0] = dets[:,0] + y
-                dets[:,1] = dets[:,1] + x
-                dets[:,2] = dets[:,2] + y
-                dets[:,3] = dets[:,3] + x
+                dets[:, 0] = dets[:, 0] + y
+                dets[:, 1] = dets[:, 1] + x
+                dets[:, 2] = dets[:, 2] + y
+                dets[:, 3] = dets[:, 3] + x
 
-                total = torch.cat((total, dets), dim=0) # gathering all coordinates in one tensor
+                # gathering all coordinates in one tensor
+                total = torch.cat((total, dets), dim=0)
 
-            total = total[nms(total[:,:4], iou_threshold=opt.iou_thres, scores=total[:,4])]
+            total = total[nms(
+                total[:, :4], iou_threshold=opt.iou_thres, scores=total[:, 4])]
             np_total = total.cpu().numpy()
-            img_np = img_np.transpose(1,2,0)  # CHW -> HWC
+            img_np = img_np.transpose(1, 2, 0)  # CHW -> HWC
 
             img = os.path.join(opt.output, os.path.basename(path))
 
@@ -91,26 +93,34 @@ def main(opt):
                 for det in np_total:
                     bbox = det[:4].round()
                     score = det[4]
-                    plot_one_box(bbox, img_np, label="{:.3f}".format(score), line_thickness=2)
+                    plot_one_box(bbox, img_np, label="{:.3f}".format(
+                        score), line_thickness=2)
                 cv2.imwrite(img, img_np)
 
             ext = img.split(".")[-1]
             txt = img.replace(ext, "txt")
 
-            np_total[:,[4,5]] = np_total[:,[5,4]] # score cls -> cls score
-            np.savetxt(txt, np_total, fmt=("%d", "%d", "%d", "%d", "%d", "%1.3f"))
+            np_total[:, [4, 5]] = np_total[:, [5, 4]]  # score cls -> cls score
+            np.savetxt(txt, np_total, fmt=(
+                "%d", "%d", "%d", "%d", "%d", "%1.3f"))
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
 
-    parser.add_argument("--input", type=str, default="input", metavar="<path-to-images>")
-    parser.add_argument("--output", type=str, default="output", metavar="<path-to-txt>")
-    parser.add_argument("--weights", type=str, default="yolov4-p5.pt", metavar="<path-to-*.pt>")
-    parser.add_argument("--device", type=str, default="cuda", metavar="<cuda|cpu>")
+    parser.add_argument("--input", type=str, default="input",
+                        metavar="<path-to-images>")
+    parser.add_argument("--output", type=str,
+                        default="output", metavar="<path-to-txt>")
+    parser.add_argument("--weights", type=str,
+                        default="yolov4-p5.pt", metavar="<path-to-*.pt>")
+    parser.add_argument("--device", type=str,
+                        default="cuda", metavar="<cuda|cpu>")
 
-    parser.add_argument("--conf-thres", type=float, default=0.5, metavar="<0-1.0>")
-    parser.add_argument("--iou-thres", type=float, default=0.1, metavar="<0-1.0>")
+    parser.add_argument("--conf-thres", type=float,
+                        default=0.5, metavar="<0-1.0>")
+    parser.add_argument("--iou-thres", type=float,
+                        default=0.1, metavar="<0-1.0>")
     parser.add_argument("--img-size", type=int, default=640, metavar="<px>")
     parser.add_argument("--overlap", type=int, default=100, metavar="<px>")
 
