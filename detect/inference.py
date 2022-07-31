@@ -50,8 +50,8 @@ def main(opt):
         infer = model.float().fuse().eval()  # load FP32 model
 
         for path, img_np in dataset:
-            total = torch.zeros((0,6), dtype=torch.float32).to(device)
-            img_np = img_np.transpose(2,0,1)  # HWC -> CHW
+            total = torch.zeros((0, 6), dtype=torch.float32).to(device)
+            img_np = img_np.transpose(2, 0, 1)  # HWC -> CHW
             tiler_obj = tiler.Tiler(data_shape=img_np.shape,
                                     tile_shape=(3, opt.img_size, opt.img_size),
                                     channel_dimension=0,
@@ -88,8 +88,10 @@ def main(opt):
             img = os.path.join(opt.output, os.path.basename(path))
 
             if opt.save_img:
-                for bbox in np_total[:,:4].round():
-                    plot_one_box(bbox, img_np, line_thickness=3)
+                for det in np_total:
+                    bbox = det[:4].round()
+                    score = det[4]
+                    plot_one_box(bbox, img_np, label="{:.3f}".format(score), line_thickness=2)
                 cv2.imwrite(img, img_np)
 
             ext = img.split(".")[-1]
