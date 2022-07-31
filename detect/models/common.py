@@ -1,4 +1,4 @@
-""" This file contains modules common to various models """
+"""This file contains modules common to various models"""
 
 import collections
 import math
@@ -8,50 +8,61 @@ from mish_cuda import MishCuda as Mish
 from torch import nn
 
 
-def autopad(k, p=None):  # kernel, padding
-    # Pad to 'same'
+def autopad(k, p=None):
+    """Pad to 'same'
+       arguments: kernel, padding"""
+
     if p is None:
         p = k // 2 if isinstance(k, int) else [x // 2 for x in k]  # auto-pad
     return p
 
 
-def DWConv(c1, c2, k=1, s=1, act=True):
-    # Depthwise convolution
+def dw_conv(c1, c2, k=1, s=1, act=True):
+    """Depthwise convolution"""
     return Conv(c1, c2, k, s, g=math.gcd(c1, c2), act=act)
 
 
 class Conv(nn.Module):
-    # Standard convolution
-    def __init__(self, c1, c2, k=1, s=1, p=None, g=1, act=True):  # ch_in, ch_out, kernel, stride, padding, groups
-        super(Conv, self).__init__()
+    """Standard convolution
+       arguments: ch_in, ch_out, kernel, stride, padding, groups"""
+
+    def __init__(self, c1, c2, k=1, s=1, p=None, g=1, act=True):
+        super().__init__()
         self.conv = nn.Conv2d(c1, c2, k, s, autopad(k, p), groups=g, bias=False)
         self.bn = nn.BatchNorm2d(c2)
         self.act = Mish() if act else nn.Identity()
 
     def forward(self, x):
+        """Run network"""
         return self.act(self.bn(self.conv(x)))
 
     def fuseforward(self, x):
+        """Run fuse"""
         return self.act(self.conv(x))
 
 
 class Bottleneck(nn.Module):
-    # Standard bottleneck
-    def __init__(self, c1, c2, shortcut=True, g=1, e=0.5):  # ch_in, ch_out, shortcut, groups, expansion
-        super(Bottleneck, self).__init__()
+    """Standard bottleneck
+       arguments: ch_in, ch_out, shortcut, groups, expansion"""
+
+    def __init__(self, c1, c2, shortcut=True, g=1, e=0.5):
+        super().__init__()
         c_ = int(c2 * e)  # hidden channels
         self.cv1 = Conv(c1, c_, 1, 1)
         self.cv2 = Conv(c_, c2, 3, 1, g=g)
         self.add = shortcut and c1 == c2
 
     def forward(self, x):
+        """Run network"""
         return x + self.cv2(self.cv1(x)) if self.add else self.cv2(self.cv1(x))
 
 
 class BottleneckCSP(nn.Module):
-    # CSP Bottleneck https://github.com/WongKinYiu/CrossStagePartialNetworks
-    def __init__(self, c1, c2, n=1, shortcut=True, g=1, e=0.5):  # ch_in, ch_out, number, shortcut, groups, expansion
-        super(BottleneckCSP, self).__init__()
+    """CSP Bottleneck https://github.com/WongKinYiu/CrossStagePartialNetworks
+       ch_in, ch_out, number, shortcut, groups, expansion"""
+
+    def __init__(self, c1, c2, n=1, shortcut=True, g=1, e=0.5):
+        super().__init__()
         c_ = int(c2 * e)  # hidden channels
         self.cv1 = Conv(c1, c_, 1, 1)
         self.cv2 = nn.Conv2d(c1, c_, 1, 1, bias=False)
@@ -62,15 +73,19 @@ class BottleneckCSP(nn.Module):
         self.m = nn.Sequential(*[Bottleneck(c_, c_, shortcut, g, e=1.0) for _ in range(n)])
 
     def forward(self, x):
+        """Run network"""
         y1 = self.cv3(self.m(self.cv1(x)))
         y2 = self.cv2(x)
+
         return self.cv4(self.act(self.bn(torch.cat((y1, y2), dim=1))))
 
 
 class BottleneckCSP2(nn.Module):
-    # CSP Bottleneck https://github.com/WongKinYiu/CrossStagePartialNetworks
-    def __init__(self, c1, c2, n=1, shortcut=False, g=1, e=0.5):  # ch_in, ch_out, number, shortcut, groups, expansion
-        super(BottleneckCSP2, self).__init__()
+    """CSP Bottleneck https://github.com/WongKinYiu/CrossStagePartialNetworks
+       arguments: ch_in, ch_out, number, shortcut, groups, expansion:"""
+
+    def __init__(self, c1, c2, n=1, shortcut=False, g=1):
+        super().__init__()
         c_ = int(c2)  # hidden channels
         self.cv1 = Conv(c1, c_, 1, 1)
         self.cv2 = nn.Conv2d(c_, c_, 1, 1, bias=False)
@@ -80,46 +95,55 @@ class BottleneckCSP2(nn.Module):
         self.m = nn.Sequential(*[Bottleneck(c_, c_, shortcut, g, e=1.0) for _ in range(n)])
 
     def forward(self, x):
+        """Run network"""
         x1 = self.cv1(x)
         y1 = self.m(x1)
         y2 = self.cv2(x1)
+
         return self.cv3(self.act(self.bn(torch.cat((y1, y2), dim=1))))
 
 
 class VoVCSP(nn.Module):
-    # CSP Bottleneck https://github.com/WongKinYiu/CrossStagePartialNetworks
-    def __init__(self, c1, c2):  # ch_in, ch_out
-        super(VoVCSP, self).__init__()
+    """CSP Bottleneck https://github.com/WongKinYiu/CrossStagePartialNetworks
+       arguments: ch_in, ch_out"""
+
+    def __init__(self, c1, c2):
+        super().__init__()
         c_ = int(c2)  # hidden channels
         self.cv1 = Conv(c1//2, c_//2, 3, 1)
         self.cv2 = Conv(c_//2, c_//2, 3, 1)
         self.cv3 = Conv(c_, c2, 1, 1)
 
     def forward(self, x):
+        """Run network"""
         _, x1 = x.chunk(2, dim=1)
         x1 = self.cv1(x1)
         x2 = self.cv2(x1)
+
         return self.cv3(torch.cat((x1,x2), dim=1))
 
 
 class SPP(nn.Module):
-    # Spatial pyramid pooling layer used in YOLOv3-SPP
+    """Spatial pyramid pooling layer used in YOLOv3-SPP"""
+
     def __init__(self, c1, c2, k=(5, 9, 13)):
-        super(SPP, self).__init__()
+        super().__init__()
         c_ = c1 // 2  # hidden channels
         self.cv1 = Conv(c1, c_, 1, 1)
         self.cv2 = Conv(c_ * (len(k) + 1), c2, 1, 1)
         self.m = nn.ModuleList([nn.MaxPool2d(kernel_size=x, stride=1, padding=x // 2) for x in k])
 
     def forward(self, x):
+        """Run network"""
         x = self.cv1(x)
         return self.cv2(torch.cat([x] + [m(x) for m in self.m], 1))
 
 
 class SPPCSP(nn.Module):
-    # CSP SPP https://github.com/WongKinYiu/CrossStagePartialNetworks
+    """CSP SPP https://github.com/WongKinYiu/CrossStagePartialNetworks"""
+
     def __init__(self, c1, c2, e=0.5, k=(5, 9, 13)):
-        super(SPPCSP, self).__init__()
+        super().__init__()
         c_ = int(2 * c2 * e)  # hidden channels
         self.cv1 = Conv(c1, c_, 1, 1)
         self.cv2 = nn.Conv2d(c1, c_, 1, 1, bias=False)
@@ -133,88 +157,125 @@ class SPPCSP(nn.Module):
         self.cv7 = Conv(2 * c_, c2, 1, 1)
 
     def forward(self, x):
+        """Run network"""
         x1 = self.cv4(self.cv3(self.cv1(x)))
         y1 = self.cv6(self.cv5(torch.cat([x1] + [m(x1) for m in self.m], 1)))
         y2 = self.cv2(x)
+
         return self.cv7(self.act(self.bn(torch.cat((y1, y2), dim=1))))
 
 
 class MP(nn.Module):
-    # Spatial pyramid pooling layer used in YOLOv3-SPP
+    """Spatial pyramid pooling layer used in YOLOv3-SPP"""
+
     def __init__(self, k=2):
-        super(MP, self).__init__()
+        super().__init__()
         self.m = nn.MaxPool2d(kernel_size=k, stride=k)
 
     def forward(self, x):
+        """Run network"""
         return self.m(x)
 
 
 class Focus(nn.Module):
-    # Focus wh information into c-space
-    def __init__(self, c1, c2, k=1, s=1, p=None, g=1, act=True):  # ch_in, ch_out, kernel, stride, padding, groups
-        super(Focus, self).__init__()
+    """Focus wh information into c-space
+       arguments: ch_in, ch_out, kernel, stride, padding, groups"""
+
+    def __init__(self, c1, c2, k=1, s=1, p=None, g=1, act=True):
+        super().__init__()
         self.conv = Conv(c1 * 4, c2, k, s, p, g, act)
 
     def forward(self, x):  # x(b,c,w,h) -> y(b,4c,w/2,h/2)
-        return self.conv(torch.cat([x[..., ::2, ::2], x[..., 1::2, ::2], x[..., ::2, 1::2], x[..., 1::2, 1::2]], 1))
+        """Run network"""
+        return self.conv(torch.cat([x[..., ::2, ::2],
+                                    x[..., 1::2, ::2],
+                                    x[..., ::2, 1::2],
+                                    x[..., 1::2, 1::2]], 1))
 
 
 class Concat(nn.Module):
-    # Concatenate a list of tensors along dimension
+    """Concatenate a list of tensors along dimension"""
+
     def __init__(self, dimension=1):
-        super(Concat, self).__init__()
+        super().__init__()
         self.d = dimension
 
     def forward(self, x):
+        """Run network"""
         return torch.cat(x, self.d)
 
 
 class Flatten(nn.Module):
-    # Use after nn.AdaptiveAvgPool2d(1) to remove last 2 dimensions
+    """Use after nn.AdaptiveAvgPool2d(1) to remove last 2 dimensions"""
+
     @staticmethod
     def forward(x):
+        """Run network"""
         return x.view(x.size(0), -1)
 
 
 class Classify(nn.Module):
-    # Classification head, i.e. x(b,c1,20,20) to x(b,c2)
-    def __init__(self, c1, c2, k=1, s=1, p=None, g=1):  # ch_in, ch_out, kernel, stride, padding, groups
-        super(Classify, self).__init__()
+    """Classification head, i.e. x(b,c1,20,20) to x(b,c2)
+       arguments: ch_in, ch_out, kernel, stride, padding, groups"""
+
+    def __init__(self, c1, c2, k=1, s=1, p=None, g=1):
+        super().__init__()
         self.aap = nn.AdaptiveAvgPool2d(1)  # to x(b,c1,1,1)
         self.conv = nn.Conv2d(c1, c2, k, s, autopad(k, p), groups=g, bias=False)  # to x(b,c2,1,1)
         self.flat = Flatten()
 
     def forward(self, x):
+        """Run network"""
         z = torch.cat([self.aap(y) for y in (x if isinstance(x, list) else [x])], 1)  # cat if list
         return self.flat(self.conv(z))  # flatten to x(b,c2)
 
 
 class CombConvLayer(nn.Sequential):
+    """ConvLayer + DWConvLayer"""
+
     def __init__(self, in_channels, out_channels, kernel=1, stride=1):
         super().__init__()
-        self.add_module('layer1',ConvLayer(in_channels, out_channels, kernel))
-        self.add_module('layer2',DWConvLayer(out_channels, out_channels, stride=stride))
+        self.add_module("layer1", ConvLayer(in_channels, out_channels, kernel))
+        self.add_module("layer2", DWConvLayer(out_channels, stride=stride))
 
 
 class DWConvLayer(nn.Sequential):
-    def __init__(self, in_channels, stride=1,  bias=False):
+    """dwconv + norm"""
+
+    def __init__(self, in_channels, stride=1, bias=False):
         super().__init__()
         groups = in_channels
-        self.add_module('dwconv', nn.Conv2d(groups, groups, kernel_size=3, stride=stride, padding=1, groups=groups, bias=bias))
-        self.add_module('norm', nn.BatchNorm2d(groups))
+        self.add_module("dwconv", nn.Conv2d(groups,
+                                            groups,
+                                            kernel_size=3,
+                                            stride=stride,
+                                            padding=1,
+                                            groups=groups,
+                                            bias=bias))
+        self.add_module("norm", nn.BatchNorm2d(groups))
 
 
 class ConvLayer(nn.Sequential):
+    """conv + norm + relu"""
+
     def __init__(self, in_channels, out_channels, kernel=3, stride=1, bias=False):
         super().__init__()
         out_ch = out_channels
         groups = 1
-        self.add_module('conv', nn.Conv2d(in_channels, out_ch, kernel_size=kernel, stride=stride, padding=kernel // 2, groups=groups, bias=bias))
-        self.add_module('norm', nn.BatchNorm2d(out_ch))
-        self.add_module('relu', nn.ReLU6(True))
+        self.add_module("conv", nn.Conv2d(in_channels,
+                                          out_ch,
+                                          kernel_size=kernel,
+                                          stride=stride,
+                                          padding=kernel // 2,
+                                          groups=groups,
+                                          bias=bias))
+        self.add_module("norm", nn.BatchNorm2d(out_ch))
+        self.add_module("relu", nn.ReLU6(True))
 
 
 class HarDBlock(nn.Module):
+    """HarDBlock"""
+
     def get_link(self, layer, base_ch, growth_rate, grmul):
         if layer == 0:
             return base_ch, 0, []
@@ -257,20 +318,21 @@ class HarDBlock(nn.Module):
         self.layers = nn.ModuleList(layers_)
 
     def forward(self, x):
+        """Run network"""
         layers_ = [x]
-        
+
         for layer in range(len(self.layers)):
             link = self.links[layer]
             tin = []
             for i in link:
                 tin.append(layers_[i])
-            if len(tin) > 1:            
+            if len(tin) > 1:
                 x = torch.cat(tin, 1)
             else:
                 x = tin[0]
             out = self.layers[layer](x)
             layers_.append(out)
-            
+
         t = len(layers_)
         out_ = []
         for i in range(t):
@@ -281,6 +343,8 @@ class HarDBlock(nn.Module):
 
 
 class BRLayer(nn.Sequential):
+    """BRLayer (norm + relu)"""
+
     def __init__(self, in_channels):
         super().__init__()
         self.add_module('norm', nn.BatchNorm2d(in_channels))
@@ -288,7 +352,11 @@ class BRLayer(nn.Sequential):
 
 
 class HarDBlock2(nn.Module):
+    """HarDBlock2"""
+
     def get_link(self, layer, base_ch, growth_rate, grmul):
+        """Returns out channels, in channels, link"""
+
         if layer == 0:
             return base_ch, 0, []
         out_channels = growth_rate
@@ -308,6 +376,7 @@ class HarDBlock2(nn.Module):
         return out_channels, in_channels, link
 
     def get_out_ch(self):
+        """Returs out channels"""
         return self.out_channels
 
     def __init__(self, in_channels, growth_rate, grmul, n_layers):
@@ -330,17 +399,23 @@ class HarDBlock2(nn.Module):
             accum_out_ch = sum( self.out_partition[i] )
             real_out_ch = self.out_partition[i][0]
 
-            conv_layers_.append( nn.Conv2d(cur_ch, accum_out_ch, kernel_size=3, stride=1, padding=1, bias=True) )
-            bnrelu_layers_.append( BRLayer(real_out_ch) )
+            conv_layers_.append(nn.Conv2d(cur_ch,
+                                          accum_out_ch,
+                                          kernel_size=3,
+                                          stride=1,
+                                          padding=1,
+                                          bias=True))
+            bnrelu_layers_.append(BRLayer(real_out_ch))
             cur_ch = real_out_ch
             if (i % 2 == 0) or (i == n_layers - 1):
                 self.out_channels += real_out_ch
 
         self.conv_layers = nn.ModuleList(conv_layers_)
         self.bnrelu_layers = nn.ModuleList(bnrelu_layers_)
-    
+
     def transform(self, blk, trt=False):
-        # Transform weight matrix from a pretrained HarDBlock v1
+        """Transform weight matrix from a pretrained HarDBlock v1"""
+
         in_ch = blk.layers[0][0].weight.shape[1]
         for i in range(len(self.conv_layers)):
             link = self.links[i].copy()
@@ -349,11 +424,10 @@ class HarDBlock2(nn.Module):
             part = self.out_partition[i]
             w_src = blk.layers[i][0].weight
             b_src = blk.layers[i][0].bias
-            
-            
+
             self.conv_layers[i].weight[0:part[0], :, :,:] = w_src[:, 0:in_ch, :,:]
             self.layer_bias.append(b_src)
-            
+
             if b_src is not None:
                 if trt:
                     self.conv_layers[i].bias[1:part[0]] = b_src[1:]
@@ -385,10 +459,12 @@ class HarDBlock2(nn.Module):
                 self.bnrelu_layers[i] = blk.layers[i][1]
 
     def forward(self, x):
+        """Run network"""
+
         layers_ = []
         outs_ = []
         xin = x
-        for i in range(len(self.conv_layers)):
+        for i in enumerate(self.conv_layers):
             link = self.links[i]
             part = self.out_partition[i]
             xout = self.conv_layers[i](xin)
