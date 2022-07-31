@@ -3,3 +3,4 @@ __pycache__/
 env/
 saved_model/
 runs/
+bin/
