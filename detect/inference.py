@@ -27,7 +27,7 @@ class ImagesDataset(Dataset):
 
     def __getitem__(self, i):
         path = self.files[i]
-        print(f"[{i+1}/{len(self)}] {path}")
+        print(f"[{i + 1}/{len(self)}] {path}")
 
         img_np = cv2.imread(path)
         img_np = cv2.cvtColor(img_np, cv2.COLOR_BGR2RGB)
@@ -96,16 +96,19 @@ def main(opt):
                 for det in np_total:
                     bbox = det[:4].round()
                     score = det[4]
-                    plot_one_box(bbox, img_np, label="{:.3f}".format(
-                        score), line_thickness=2)
+                    plot_one_box(bbox,
+                                 img_np,
+                                 label="{:.3f}".format(score),
+                                 line_thickness=2)
                 cv2.imwrite(img, img_np)
 
             ext = img.split(".")[-1]
             txt = img.replace(ext, "txt")
 
             np_total[:, [4, 5]] = np_total[:, [5, 4]]  # score cls -> cls score
-            np.savetxt(txt, np_total, fmt=(
-                "%d", "%d", "%d", "%d", "%d", "%1.3f"))
+            fmt = ("%d", "%d", "%d", "%d", "%d", "%1.3f")
+
+            np.savetxt(txt, np_total, fmt=fmt)
 
 
 if __name__ == "__main__":
@@ -114,17 +117,17 @@ if __name__ == "__main__":
     parser.add_argument("--input",
                         type=str,
                         required=True,
-                        metavar="<path-to-images>")
+                        metavar="<path>")
 
     parser.add_argument("--output",
                         type=str,
                         default=".",
-                        metavar="<path-to-txt>")
+                        metavar="<path>")
 
     parser.add_argument("--weights",
                         type=str,
                         required=True,
-                        metavar="<path-to-*.pt>")
+                        metavar="<path>")
 
     parser.add_argument("--device",
                         type=str,
@@ -134,12 +137,12 @@ if __name__ == "__main__":
     parser.add_argument("--conf-thres",
                         type=float,
                         default=0.5,
-                        metavar="<0-1.0>")
+                        metavar="(.0-1.0)")
 
     parser.add_argument("--iou-thres",
                         type=float,
                         default=0.1,
-                        metavar="<0-1.0>")
+                        metavar="(.0-1.0)")
 
     parser.add_argument("--img-size",
                         type=int,

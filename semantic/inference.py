@@ -45,7 +45,7 @@ def main(opt):
                      out_classes=1)
 
     model.load_state_dict(state_dict["state_dict"])
-    model.to(device)
+    model = model.to(device)
 
     with torch.no_grad():
         model.eval()
