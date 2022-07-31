@@ -39,8 +39,8 @@ def main(opt):
 
     device = torch.device(opt.device)
     state_dict = torch.load(opt.weights)
-    model = SegModel(opt.arch,
-                     opt.encoder,
+    model = SegModel("UnetPlusPlus",
+                     "resnext50_32x4d",
                      in_channels=3,
                      out_classes=1)
 
@@ -49,8 +49,8 @@ def main(opt):
 
     with torch.no_grad():
         model.eval()
-        prep = smp.encoders.get_preprocessing_fn(encoder_name=opt.encoder,
-                                                 pretrained=opt.encoder_weights)
+        prep = smp.encoders.get_preprocessing_fn(encoder_name="resnext50_32x4d",
+                                                 pretrained="imagenet")
         dataset = ImagesDataset(opt.input)
 
         for image, img_np in dataset:
@@ -99,26 +99,49 @@ def main(opt):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
 
-    parser.add_argument("--input", type=str, default=".",
-                        metavar="<path-to-images>")
-    parser.add_argument("--output", type=str, default=".",
-                        metavar="<path-to-masks>")
-    parser.add_argument("--weights", type=str,
-                        default="weights.ckpt", metavar="<path-to-*.ckpt>")
-    parser.add_argument("--device", type=str,
-                        default="cuda", metavar="<cuda|cpu>")
-    parser.add_argument("--batch-size", type=int, default=4, metavar="<int>")
-    parser.add_argument("--arch", type=str,
-                        default="UnetPlusPlus", metavar="<str>")
-    parser.add_argument("--encoder", type=str,
-                        default="resnext50_32x4d", metavar="<str>")
-    parser.add_argument("--encoder-weights", type=str,
-                        default="imagenet", metavar="<str>")
-    parser.add_argument("--img-size", type=int, default=640, metavar="<px>")
-    parser.add_argument("--overlap", type=int, default=100, metavar="<px>")
-    parser.add_argument("--shrink", type=float,
-                        default=0.85, metavar="<0-1.0>")
-    parser.add_argument("--conf-thres", type=float,
-                        default=0.5, metavar="<0-1.0>")
+    parser.add_argument("--input",
+                        type=str,
+                        required=True,
+                        metavar="<path>")
+
+    parser.add_argument("--output",
+                        type=str,
+                        default=".",
+                        metavar="<path>")
+
+    parser.add_argument("--weights",
+                        type=str,
+                        required=True,
+                        metavar="<path>")
+
+    parser.add_argument("--device",
+                        type=str,
+                        default="cuda",
+                        metavar="<cuda|cpu>")
+
+    parser.add_argument("--batch-size",
+                        type=int,
+                        default=2,
+                        metavar="<int>")
+
+    parser.add_argument("--img-size",
+                        type=int,
+                        default=640,
+                        metavar="<px>")
+
+    parser.add_argument("--overlap",
+                        type=int,
+                        default=100,
+                        metavar="<px>")
+
+    parser.add_argument("--shrink",
+                        type=float,
+                        default=0.85,
+                        metavar="(.0-1.0)")
+
+    parser.add_argument("--conf-thres",
+                        type=float,
+                        default=0.5,
+                        metavar="(.0-1.0)")
 
     main(parser.parse_args())
