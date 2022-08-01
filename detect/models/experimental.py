@@ -1,4 +1,4 @@
-"""This file contains experimental modules """
+"""This file contains experimental modules"""
 
 import numpy as np
 import torch
@@ -8,26 +8,32 @@ from .common import Conv, dw_conv
 
 
 class CrossConv(nn.Module):
-    """Cross Convolution Downsample"""
+    """
+       Cross Convolution Downsample
+       args: ch_in, ch_out, kernel, stride, groups, expansion, shortcut
+    """
 
     def __init__(self, c1, c2, k=3, s=1, g=1, e=1.0, shortcut=False):
-        # ch_in, ch_out, kernel, stride, groups, expansion, shortcut
-        super().__init__()
         c_ = int(c2 * e)  # hidden channels
         self.cv1 = Conv(c1, c_, (1, k), (1, s))
         self.cv2 = Conv(c_, c2, (k, 1), (s, 1), g=g)
         self.add = shortcut and c1 == c2
 
+        super().__init__()
+
     def forward(self, x):
+        """Forward"""
         return x + self.cv2(self.cv1(x)) if self.add else self.cv2(self.cv1(x))
 
 
 class C3(nn.Module):
-    """Cross Convolution CSP"""
+    """
+        Cross Convolution CSP
+        args: ch_in, ch_out, number, shortcut, groups, expansion
+    """
 
-    # ch_in, ch_out, number, shortcut, groups, expansion
     def __init__(self, c1, c2, n=1, shortcut=True, g=1, e=0.5):
-        super().__init__()
+
         c_ = int(c2 * e)  # hidden channels
         self.cv1 = Conv(c1, c_, 1, 1)
         self.cv2 = nn.Conv2d(c1, c_, 1, 1, bias=False)
@@ -35,12 +41,16 @@ class C3(nn.Module):
         self.cv4 = Conv(2 * c_, c2, 1, 1)
         self.bn = nn.BatchNorm2d(2 * c_)  # applied to cat(cv2, cv3)
         self.act = nn.LeakyReLU(0.1, inplace=True)
-        self.m = nn.Sequential(
-            *[CrossConv(c_, c_, 3, 1, g, 1.0, shortcut) for _ in range(n)])
+        self.m = nn.Sequential(*[CrossConv(c_, c_, 3, 1, g, 1.0, shortcut) for _ in range(n)])
+
+        super().__init__()
 
     def forward(self, x):
+        """Forward"""
+
         y1 = self.cv3(self.m(self.cv1(x)))
         y2 = self.cv2(x)
+
         return self.cv4(self.act(self.bn(torch.cat((y1, y2), dim=1))))
 
 
@@ -48,14 +58,16 @@ class Sum(nn.Module):
     """Weighted sum of 2 or more layers https://arxiv.org/abs/1911.09070"""
 
     def __init__(self, n, weight=False):  # n: number of inputs
-        super(Sum, self).__init__()
         self.weight = weight  # apply weights boolean
         self.iter = range(n - 1)  # iter object
         if weight:
             self.w = nn.Parameter(-torch.arange(1., n) / 2,
                                   requires_grad=True)  # layer weights
+        super().__init__()
 
     def forward(self, x):
+        """Forward"""
+
         y = x[0]  # no weight
         if self.weight:
             w = torch.sigmoid(self.w) * 2
@@ -68,16 +80,21 @@ class Sum(nn.Module):
 
 
 class GhostConv(nn.Module):
-    """Ghost Convolution https://github.com/huawei-noah/ghostnet"""
+    """
+        Ghost Convolution https://github.com/huawei-noah/ghostnet
+        args: ch_in, ch_out, kernel, stride, groups
+    """
 
-    # ch_in, ch_out, kernel, stride, groups
     def __init__(self, c1, c2, k=1, s=1, g=1, act=True):
-        super().__init__()
         c_ = c2 // 2  # hidden channels
         self.cv1 = Conv(c1, c_, k, s, g, act)
         self.cv2 = Conv(c_, c_, 5, 1, c_, act)
 
+        super().__init__()
+
     def forward(self, x):
+        """Forward"""
+
         y = self.cv1(x)
         return torch.cat([y, self.cv2(y)], 1)
 
@@ -96,6 +113,7 @@ class GhostBottleneck(nn.Module):
                                       Conv(c1, c2, 1, 1, act=False)) if s == 2 else nn.Identity()
 
     def forward(self, x):
+        """Forward"""
         return self.conv(x) + self.shortcut(x)
 
 
@@ -124,6 +142,7 @@ class MixConv2d(nn.Module):
         self.act = nn.LeakyReLU(0.1, inplace=True)
 
     def forward(self, x):
+        """Forward"""
         return x + self.act(self.bn(torch.cat([m(x) for m in self.m], 1)))
 
 
@@ -134,6 +153,7 @@ class Ensemble(nn.ModuleList):
         super().__init__()
 
     def forward(self, x, augment=False):
+        """Forward"""
         y = []
         for module in self:
             y.append(module(x, augment)[0])

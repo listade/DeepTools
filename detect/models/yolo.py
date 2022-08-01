@@ -5,7 +5,7 @@ from copy import deepcopy
 from pathlib import Path
 
 import torch
-import torch.nn as nn
+from torch import nn
 
 from ..utils.general import check_anchor_order, make_divisible
 from ..utils.torch_utils import (fuse_conv_and_bn, initialize_weights,
@@ -18,7 +18,6 @@ class Detect(nn.Module):
     """Detect nn-module"""
 
     def __init__(self, nc=80, anchors=(), ch=()):  # detection layer
-        super(Detect, self).__init__()
 
         self.stride = None  # strides computed during build
         self.nc = nc  # number of classes
@@ -33,6 +32,7 @@ class Detect(nn.Module):
         self.m = nn.ModuleList(nn.Conv2d(x, self.no * self.na, 1)
                                for x in ch)  # output conv
         self.export = False  # onnx export
+        super().__init__()
 
     def forward(self, x):
         z = []  # inference output
@@ -64,9 +64,8 @@ class Detect(nn.Module):
 
 class Model(nn.Module):
 
-    # model, input channels, number of classes
+    """args: model, input channels, number of classes"""
     def __init__(self, cfg='yolov4-p5.yaml', ch=3, nc=None):
-        super(Model, self).__init__()
         if isinstance(cfg, dict):
             self.yaml = cfg  # model dict
         else:  # is *.yaml
@@ -98,9 +97,12 @@ class Model(nn.Module):
         # Init weights, biases
         initialize_weights(self)
         self.info()
-        print('')
+
+        super().__init__()
 
     def forward(self, x, augment=False, profile=False):
+        """Forward"""
+
         if augment:
             img_size = x.shape[-2:]  # height, width
             s = [1, 0.83, 0.67]  # scales

@@ -988,7 +988,7 @@ def plot_results(start=0, stop=0, bucket='', id=(), labels=(), save_dir=''):
                 if i in [0, 1, 2, 5, 6, 7]:
                     y[y == 0] = np.nan  # dont show zero loss values
                     # y /= y[0]  # normalize
-                label = labels[fi] if len(labels) else Path(f).stem
+                label = labels[fi] if len(labels) > 0 else Path(f).stem
                 ax[i].plot(x, y, marker='.', label=label,
                            linewidth=2, markersize=8)
                 ax[i].set_title(s[i])

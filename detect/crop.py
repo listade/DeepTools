@@ -129,11 +129,21 @@ def crop(img_path, txt_path, img_size=640, draw_labels=False):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
 
-    parser.add_argument("--images", type=str,
-                        metavar="<path-to-images>", default=".")
-    parser.add_argument("--labels", type=str,
-                        metavar="<path-to-txt-labels>", default=".")
-    parser.add_argument("--img-size", type=int, metavar="<px>", default=640)
+    parser.add_argument("--images",
+                        type=str,
+                        metavar="<path>",
+                        required=True)
+
+    parser.add_argument("--labels",
+                        type=str,
+                        metavar="<path>",
+                        required=True)
+
+    parser.add_argument("--img-size",
+                        type=int,
+                        metavar="<px>",
+                        default=640)
+
     parser.add_argument("--draw-labels", action="store_true")
 
     opt = parser.parse_args()
