@@ -3,6 +3,8 @@
 
 # Install
 
+Python 3.7.9
+
 CUDA 11.6
 https://developer.download.nvidia.com/compute/cuda/11.6.2/local_installers/cuda_11.6.2_511.65_windows.exe
 
