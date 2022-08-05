@@ -3,6 +3,8 @@
 
 # Install
 
+Python 3.7.9
+
 CUDA 11.6
 https://developer.download.nvidia.com/compute/cuda/11.6.2/local_installers/cuda_11.6.2_511.65_windows.exe
 
@@ -48,11 +50,11 @@ https://developer.download.nvidia.com/compute/redist/cudnn/v8.4.0/local_installe
 ```
 $ pylint --generated-members=cv2.*,torch.* semantic
 ------------------------------------------------------------------
-Your code has been rated at 8.25/10 (previous run: 6.43/10, +1.83)
+Your code has been rated at 8.28/10 (previous run: 8.25/10, +0.02)
 
 $ pylint --generated-members=cv2.*,torch.* detect
 ------------------------------------------------------------------
-Your code has been rated at 6.24/10 (previous run: 6.24/10, +0.00)
+Your code has been rated at 6.31/10 (previous run: 6.15/10, +0.16)
 ```
 
 The project is fork https://github.com/ultralytics/yolov5
