@@ -2,6 +2,8 @@
 #define AppVersion "1.0"
 #define AppPublisher "Sholukh Egor"
 
+#define CUDA_Path "{sd}\cudnn-windows-x86_64-8.4.0.27_cuda11.6-archive\bin"
+
 [Setup]
 AppId={{7b281e88-150e-46f6-a11d-c46d70783e4e}
 AppName={#AppName}
@@ -15,6 +17,9 @@ Compression=lzma
 SolidCompression=yes
 WizardStyle=modern
 OutputDir="."
+SetupLogging=yes
+RestartIfNeededByRun=no
+ChangesEnvironment=yes
 
 [Languages]
 Name: "english"; MessagesFile: "compiler:Default.isl"
@@ -25,8 +30,49 @@ Source: "cfg\*"; DestDir: "{app}\cfg"; Flags: recursesubdirs ignoreversion
 Source: "data\*"; DestDir: "{app}\data"; Flags: recursesubdirs ignoreversion
 
 [Run]
-Filename: "{src}\build.bat"; Parameters: """{app}"""; Flags: waituntilterminated shellexec
-Filename: "{cmd}"; Parameters: "/k cd ""{app}"" & env\Scripts\activate.bat"; Description: "Launch application"; Flags: nowait unchecked postinstall
+Filename: "{src}\dist\python-3.7.9-amd64.exe"; Parameters: "/passive PrependPath=1"; Flags: waituntilterminated;
+Filename: "{src}\dist\cuda_11.6.2_511.65_windows.exe"; Flags: waituntilterminated
+Filename: "powershell"; Parameters: "-command ""Expand-Archive -Force -Verbose '{src}\dist\cudnn-windows-x86_64-8.4.0.27_cuda11.6-archive.zip' '{sd}\' "" "; Flags: waituntilterminated;
+Filename: "{src}\build.bat"; Parameters: """{app}"""; Flags: waituntilterminated
+
+Filename: "{cmd}"; Parameters: "/k cd ""{app}"" && env\Scripts\activate.bat"; Description: "Run environment"; Flags: postinstall
+
+[UninstallRun]
+Filename: "{src}\dist\python-3.7.9-amd64.exe"; Parameters: "/uninstall"; Flags: waituntilterminated
+
 
 [UninstallDelete]
 Type: filesandordirs; Name: "{app}\env"
+Type: filesandordirs; Name: "{sd}\cudnn-windows-x86_64-8.4.0.27_cuda11.6-archive"
+
+[Registry]
+Root: HKLM; Subkey: "SYSTEM\CurrentControlSet\Control\Session Manager\Environment"; ValueType: expandsz; ValueName: "Path"; ValueData: "{olddata};{#CUDA_Path}"; Check: NeedsAddPath(ExpandConstant('{#CUDA_Path}'))
+
+[Code]
+procedure CurStepChanged(CurStep: TSetupStep);
+var
+  logfilepathname, logfilename, newfilepathname: string;
+begin
+  logfilepathname := ExpandConstant('{log}');
+  logfilename := ExtractFileName(logfilepathname);
+  newfilepathname := ExpandConstant('{src}\') + logfilename;
+
+  if CurStep = ssDone then
+  begin
+    FileCopy(logfilepathname, newfilepathname, false);
+  end;
+end;
+
+function NeedsAddPath(Param: string): boolean;
+var
+  OrigPath: string;
+begin
+  if not RegQueryStringValue(HKEY_LOCAL_MACHINE, 'SYSTEM\CurrentControlSet\Control\Session Manager\Environment', 'Path', OrigPath)
+  then begin
+    Result := True;
+    exit;
+  end;
+  { look for the path with leading and trailing semicolon }
+  { Pos() returns 0 if not found }
+  Result := Pos(';' + Param + ';', ';' + OrigPath + ';') = 0;
+end;
