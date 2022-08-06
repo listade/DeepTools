@@ -1,3 +1,5 @@
+call RefreshEnv.cmd
+
 python -m venv "%~1\env"
 call "%~1\env\Scripts\activate.bat"
 

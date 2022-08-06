@@ -12,13 +12,12 @@ AppPublisher={#AppPublisher}
 DefaultDirName={autopf}\{#AppName}
 DefaultGroupName={#AppName}
 DisableProgramGroupPage=yes
-OutputBaseFilename=setup
+OutputBaseFilename=install
 Compression=lzma
 SolidCompression=yes
 WizardStyle=modern
 OutputDir="."
 SetupLogging=yes
-RestartIfNeededByRun=no
 ChangesEnvironment=yes
 
 [Languages]
@@ -30,15 +29,15 @@ Source: "cfg\*"; DestDir: "{app}\cfg"; Flags: recursesubdirs ignoreversion
 Source: "data\*"; DestDir: "{app}\data"; Flags: recursesubdirs ignoreversion
 
 [Run]
-Filename: "{src}\dist\python-3.7.9-amd64.exe"; Parameters: "/passive PrependPath=1"; Flags: waituntilterminated;
-Filename: "{src}\dist\cuda_11.6.2_511.65_windows.exe"; Flags: waituntilterminated
-Filename: "powershell"; Parameters: "-command ""Expand-Archive -Force -Verbose '{src}\dist\cudnn-windows-x86_64-8.4.0.27_cuda11.6-archive.zip' '{sd}\' "" "; Flags: waituntilterminated;
-Filename: "{src}\build.bat"; Parameters: """{app}"""; Flags: waituntilterminated
+Filename: "{src}\dist\python-3.7.9-amd64.exe"; Parameters: "/silent PrependPath=1"; Flags: waituntilterminated; StatusMsg: "Installing Python3.7"
+Filename: "{src}\dist\cuda_11.6.2_511.65_windows.exe"; Parameters: "-s"; Flags: waituntilterminated; StatusMsg: "Installing CUDA 11.6"
+Filename: "powershell"; Parameters: "-command ""Expand-Archive -Force -Verbose '{src}\dist\cudnn-windows-x86_64-8.4.0.27_cuda11.6-archive.zip' '{sd}\' "" "; Flags: waituntilterminated runhidden; StatusMsg: "Installing CUDNN 8.4"
+Filename: "{src}\build.bat"; Parameters: """{app}"""; Flags: waituntilterminated runhidden; StatusMsg: "Installing pip packages"
 
 Filename: "{cmd}"; Parameters: "/k cd ""{app}"" && env\Scripts\activate.bat"; Description: "Run environment"; Flags: postinstall
 
 [UninstallRun]
-Filename: "{src}\dist\python-3.7.9-amd64.exe"; Parameters: "/uninstall"; Flags: waituntilterminated
+Filename: "{src}\dist\python-3.7.9-amd64.exe"; RunOnceId: "RemovePython";  Parameters: "/uninstall /silent"; Flags: waituntilterminated; StatusMsg: "Uninstall Python3.7"
 
 
 [UninstallDelete]
@@ -49,6 +48,7 @@ Type: filesandordirs; Name: "{sd}\cudnn-windows-x86_64-8.4.0.27_cuda11.6-archive
 Root: HKLM; Subkey: "SYSTEM\CurrentControlSet\Control\Session Manager\Environment"; ValueType: expandsz; ValueName: "Path"; ValueData: "{olddata};{#CUDA_Path}"; Check: NeedsAddPath(ExpandConstant('{#CUDA_Path}'))
 
 [Code]
+
 procedure CurStepChanged(CurStep: TSetupStep);
 var
   logfilepathname, logfilename, newfilepathname: string;
