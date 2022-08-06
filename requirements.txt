@@ -1,0 +1,12 @@
+matplotlib
+numpy
+opencv-python
+Pillow
+pyaml
+scipy
+tqdm
+tensorboard
+tiler
+pyproj
+pytorch_lightning
+albumentations

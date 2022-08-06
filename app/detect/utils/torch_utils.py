@@ -34,7 +34,7 @@ def select_device(device, batch_size=1):
     if words[0] != "cuda":
         raise Exception(f"invalid device: {device}")
 
-    os.environ["CUDA_VISIBLE_DEVICES"] = device
+    # os.environ["CUDA_VISIBLE_DEVICES"] = device
     if not torch.cuda.is_available():
         raise Exception("cuda is unavailable")
 
