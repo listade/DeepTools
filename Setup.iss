@@ -8,7 +8,7 @@
 [Setup]
 ; NOTE: The value of AppId uniquely identifies this application. Do not use the same AppId value in installers for other applications.
 ; (To generate a new GUID, click Tools | Generate GUID inside the IDE.)
-AppId={{EE7FB96A-546F-4132-9B80-8D700178C901}
+AppId={{7b281e88-150e-46f6-a11d-c46d70783e4e}
 AppName={#AppName}
 AppVersion={#AppVersion}
 AppPublisher={#AppPublisher}
@@ -30,15 +30,4 @@ Source: "cfg\*"; DestDir: "{app}\cfg"; Flags: recursesubdirs ignoreversion
 Source: "data\*"; DestDir: "{app}\data"; Flags: recursesubdirs ignoreversion
 
 [Run]
-
-; Install torch torchvision torchaudio
-Filename: "python.exe"; Parameters: "-m pip install {src}\pip\torch-1.12.1+cu116-cp37-cp37m-win_amd64.whl {src}\pip\torchvision-0.13.1+cu116-cp37-cp37m-win_amd64.whl {src}\pip\torchaudio-0.12.1+cu116-cp37-cp37m-win_amd64.whl"; Flags: waituntilterminated
-
-; Install segmentation-models-pytorch
-Filename: "python.exe"; Parameters: "-m pip install {src}\lib\segmentation-models-pytorch"; Flags: waituntilterminated
-
-; Install mish-cuda
-Filename: "python.exe"; Parameters: "-m pip install {src}\lib\mish-cuda"; Flags: waituntilterminated
-
-; Install packages from requirements.txt
-Filename: "python.exe"; Parameters: "-m pip install --no-index --find-links {src}\pip -r {src}\requirements.txt"; Flags: waituntilterminated
+Filename: "{src}\build.bat"; Parameters: """{app}"""; Flags: waituntilterminated shellexec
