@@ -25,10 +25,6 @@ https://developer.download.nvidia.com/compute/redist/cudnn/v8.4.0/local_installe
   ```
     $ python -m semantic.inference --input ./images --weights ./weights.ckpt
   ```
-  Images cropping
-  ```
-    $ python -m detect.crop --images ./images --labels ./labels
-  ```
   Training object detection
   ```
     $ python -m detect.train --data ./data/data.yaml --hyp ./data/hyp.scratch.yaml --epochs 300
