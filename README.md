@@ -33,7 +33,7 @@ https://developer.download.nvidia.com/compute/redist/cudnn/v8.4.0/local_installe
   ```
     $ python -m detect.inference --input ./images --output ./labels --weights ./weights.pt --save-img
   ```
-  
+  Object detection result
   ![image](https://user-images.githubusercontent.com/96072580/182018468-b0f1ecc6-8221-4a7f-9bfe-6084d03b197d.png)
 
 ```
