@@ -1,6 +1,3 @@
-
-
-
 # Install
 
 Python 3.7.9
@@ -12,7 +9,7 @@ CUDNN for CUDA 11.x
 https://developer.download.nvidia.com/compute/redist/cudnn/v8.4.0/local_installers/11.6/cudnn-windows-x86_64-8.4.0.27_cuda11.6-archive.zip
 
 ```
-  $ pip install torch torchvision torchaudio --extra-index-url https://download.pytorch.org/whl/cu116
+  $ pip install torch torchvision --extra-index-url https://download.pytorch.org/whl/cu116
   $ pip install git+https://github.com/JunnYu/mish-cuda
   $ pip install git+https://github.com/qubvel/segmentation_models.pytorch
   $ pip install -r requirements.txt
