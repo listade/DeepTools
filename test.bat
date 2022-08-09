@@ -1,10 +1,8 @@
 
-call "%~1\env\Scripts\activate.bat"
-
-set PYTHONPATH="%~1"
+call "env\Scripts\activate.bat"
 
 echo Running detection..
-python -m app.detect.inference --input "%~1\input" --weights "%~1\weights\car.pt" --save-img --augment
+python -m detect.inference --input "input" --weights "weights\car.pt" --save-img --augment
 
 echo Running segmentation..
-python -m app.semantic.inference --input "%~1\input" --weights "%~1\weights\lake.ckpt" 
+python -m semantic.inference --input "input" --weights "weights\lake.ckpt" 

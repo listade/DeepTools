@@ -2,7 +2,10 @@
 #define AppVersion "1.0"
 #define AppPublisher "Sholukh Egor"
 
-#define CUDA_Path "{sd}\cudnn-windows-x86_64-8.4.0.27_cuda11.6-archive\bin"
+#define python "python-3.7.9-amd64.exe"
+#define cuda "cuda_11.6.2_511.65_windows.exe"
+#define cudnn "cudnn-windows-x86_64-8.4.0.27_cuda11.6-archive"
+#define cudnn_zip cudnn + ".zip"
 
 [Setup]
 AppId={{7b281e88-150e-46f6-a11d-c46d70783e4e}
@@ -25,28 +28,30 @@ RestartIfNeededByRun=no
 Name: "english"; MessagesFile: "compiler:Default.isl"
 
 [Files]
-Source: "app\*"; DestDir: "{app}\app"; Flags: recursesubdirs ignoreversion 
+Source: "app\*"; DestDir: "{app}\app"; Flags: recursesubdirs ignoreversion
 Source: "cfg\*"; DestDir: "{app}\cfg"; Flags: recursesubdirs ignoreversion
 Source: "data\*"; DestDir: "{app}\data"; Flags: recursesubdirs ignoreversion
 
-[Run]
-Filename: "{src}\dist\python-3.7.9-amd64.exe"; Parameters: "/passive PrependPath=1"; Flags: waituntilterminated; StatusMsg: "Installing Python3.7"
-Filename: "{src}\dist\cuda_11.6.2_511.65_windows.exe"; Parameters: "-s"; Flags: waituntilterminated; StatusMsg: "Installing CUDA 11.6"
-Filename: "powershell"; Parameters: "-command ""Expand-Archive -Force -Verbose '{src}\dist\cudnn-windows-x86_64-8.4.0.27_cuda11.6-archive.zip' '{sd}\' "" "; Flags: waituntilterminated; StatusMsg: "Installing CUDNN 8.4"
-Filename: "{src}\build.bat"; Parameters: """{app}"""; Flags: waituntilterminated; StatusMsg: "Installing pip packages"
+Source: "{src}\weights\*"; DestDir: "{app}\weights"; Flags: external
+Source: "{src}\input\*"; DestDir: "{app}\input"; Flags: external
 
-Filename: "{cmd}"; Parameters: "/k ""{app}\env\Scripts\activate.bat"""; Description: "Run environment"; Flags: postinstall
+[Run]
+Filename: "{src}\dist\{#python}"; Parameters: "/passive PrependPath=1"; Flags: waituntilterminated; StatusMsg: "Installing.. {#python}"
+Filename: "{src}\dist\{#cuda}"; Parameters: "-s"; Flags: waituntilterminated; StatusMsg: "Installing.. {#cuda}"
+Filename: "powershell"; Parameters: "-command ""Expand-Archive -Force -Verbose '{src}\dist\{#cudnn_zip}' '{app}\' "" "; Flags: waituntilterminated; StatusMsg: "Extracting.. {#cudnn_zip}"
+Filename: "{src}\build.bat"; Parameters: """{app}\env"""; Flags: waituntilterminated; StatusMsg: "Installing.. packages"
+Filename: "{cmd}"; Parameters: "/k {src}\test.bat"; WorkingDir: "{app}"; Description: "Run test"; Flags: postinstall runascurrentuser
 
 [UninstallRun]
-Filename: "{src}\dist\python-3.7.9-amd64.exe"; RunOnceId: "RemovePython";  Parameters: "/uninstall"; Flags: waituntilterminated; StatusMsg: "Uninstall Python3.7"
+Filename: "{src}\dist\{#Python}"; RunOnceId: "RemovePython";  Parameters: "/uninstall"; Flags: waituntilterminated; StatusMsg: "Uninstalling.. {#python}"
 
 
 [UninstallDelete]
 Type: filesandordirs; Name: "{app}\env"
-Type: filesandordirs; Name: "{sd}\cudnn-windows-x86_64-8.4.0.27_cuda11.6-archive"
+Type: filesandordirs; Name: "{app}\{#cudnn}"
 
 [Registry]
-Root: HKLM; Subkey: "SYSTEM\CurrentControlSet\Control\Session Manager\Environment"; ValueType: expandsz; ValueName: "Path"; ValueData: "{olddata};{#CUDA_Path}"; Check: NeedsAddPath(ExpandConstant('{#CUDA_Path}'))
+Root: HKLM; Subkey: "SYSTEM\CurrentControlSet\Control\Session Manager\Environment"; ValueType: expandsz; ValueName: "Path"; ValueData: "{olddata};{app}\{#cudnn}\bin"; Check: NeedsAddPath(ExpandConstant('{app}\{#cudnn}\bin'))
 
 [Code]
 
