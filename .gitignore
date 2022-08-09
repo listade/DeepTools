@@ -6,4 +6,5 @@ bin/
 dist/
 weights/
 input/
+lib/
 *.exe
