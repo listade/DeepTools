@@ -63,8 +63,8 @@ class Detect(nn.Module):
 
 
 class Model(nn.Module):
-
     """args: model, input channels, number of classes"""
+
     def __init__(self, cfg='yolov4-p5.yaml', ch=3, nc=None):
         if isinstance(cfg, dict):
             self.yaml = cfg  # model dict
@@ -80,7 +80,7 @@ class Model(nn.Module):
                   (cfg, self.yaml['nc'], nc))
             self.yaml['nc'] = nc  # override yaml value
         self.model, self.save = parse_model(
-            deepcopy(self.yaml), ch=[ch])  # model, savelist, ch_out
+            deepcopy(self.yaml), input_channels=[ch])  # model, savelist, ch_out
 
         # Build strides, anchors
         m = self.model[-1]  # Detect()
@@ -183,61 +183,95 @@ class Model(nn.Module):
         model_info(self)
 
 
-def parse_model(d, ch):  # model_dict, input_channels(3)
-    print('\n%3s%18s%3s%10s  %-40s%-30s' %
-          ('', 'from', 'n', 'params', 'module', 'arguments'))
-    anchors, nc, gd, gw = d['anchors'], d['nc'], d['depth_multiple'], d['width_multiple']
-    na = (len(anchors[0]) // 2) if isinstance(anchors,
-                                              list) else anchors  # number of anchors
-    no = na * (nc + 5)  # number of outputs = anchors * (classes + 5)
+def parse_model(model_dict, input_channels):  # model_dict, input_channels(3)
+    """Parse model"""
 
-    layers, save, c2 = [], [], ch[-1]  # layers, savelist, ch out
+    anchors = model_dict['anchors']
+    classes_num = model_dict['nc']
+    depth_multiple = model_dict['depth_multiple']
+    width_multiple = model_dict['width_multiple']
+
+    anchors_num = (len(anchors[0]) // 2) if isinstance(anchors, list) else anchors
+    outputs_num = anchors_num * (classes_num + 5)
+
+    layers = []  # layers
+    save = []  # savelist
+    out_channel = input_channels[-1]  # ch out
+
+    backbone = model_dict['backbone']
+    head = model_dict['head']
+    confs = backbone + head
+
     # from, number, module, args
-    for i, (f, n, m, args) in enumerate(d['backbone'] + d['head']):
-        m = eval(m) if isinstance(m, str) else m  # eval strings
-        for j, a in enumerate(args):
-            try:
-                args[j] = eval(a) if isinstance(a, str) else a  # eval strings
-            except:
-                pass
+    for i, (_from, number, module, args) in enumerate(confs):
+        module = eval(module) if isinstance(module, str) else module  # eval strings
 
-        n = max(round(n * gd), 1) if n > 1 else n  # depth gain
-        if m in [nn.Conv2d, Conv, Bottleneck, SPP, dw_conv, MixConv2d, Focus, CrossConv, BottleneckCSP, BottleneckCSP2, SPPCSP, VoVCSP, C3]:
-            c1, c2 = ch[f], args[0]
+        for j, arg in enumerate(args):
+            args[j] = eval(arg) if isinstance(arg, str) else arg  # eval strings
 
-            c2 = make_divisible(c2 * gw, 8) if c2 != no else c2
+        number = max(round(number * depth_multiple), 1) if number > 1 else number  # depth gain
 
-            args = [c1, c2, *args[1:]]
-            if m in [BottleneckCSP, BottleneckCSP2, SPPCSP, VoVCSP, C3]:
-                args.insert(2, n)
-                n = 1
-        elif m in [HarDBlock, HarDBlock2]:
-            c1 = ch[f]
-            args = [c1, *args[:]]
-        elif m is nn.BatchNorm2d:
-            args = [ch[f]]
-        elif m is Concat:
-            c2 = sum([ch[-1 if x == -1 else x + 1] for x in f])
-        elif m is Detect:
-            args.append([ch[x + 1] for x in f])
-            if isinstance(args[1], int):  # number of anchors
-                args[1] = [list(range(args[1] * 2))] * len(f)
+        case_0 = [nn.Conv2d,
+                  Conv,
+                  Bottleneck,
+                  SPP,
+                  dw_conv,
+                  MixConv2d,
+                  Focus,
+                  CrossConv,
+                  BottleneckCSP,
+                  BottleneckCSP2,
+                  SPPCSP,
+                  VoVCSP,
+                  C3]
+
+        case_1 = [HarDBlock, HarDBlock2]
+
+        if module in case_0:
+            in_channel = input_channels[_from]
+            out_channel = args[0]
+            out_channel = make_divisible(out_channel * width_multiple, 8) if out_channel != outputs_num else out_channel
+            args = [in_channel, out_channel, *args[1:]]
+
+            sub_case_0 = [BottleneckCSP, BottleneckCSP2, SPPCSP, VoVCSP, C3]
+            if module in sub_case_0:
+                args.insert(2, number)
+                number = 1
+        elif module in case_1:
+            in_channel = input_channels[_from]
+            args = [in_channel, *args[:]]
+        elif module is nn.BatchNorm2d:
+            args = [input_channels[_from]]
+        elif module is Concat:
+            out_channel = sum([input_channels[-1 if x == -1 else x + 1] for x in _from])
+        elif module is Detect:
+            args.append([input_channels[x + 1] for x in _from])
+            # number of anchors
+            if isinstance(args[1], int):
+                args[1] = [list(range(args[1] * 2))] * len(_from)
         else:
-            c2 = ch[f]
+            out_channel = input_channels[_from]
 
-        m_ = nn.Sequential(*[m(*args) for _ in range(n)]
-                           ) if n > 1 else m(*args)  # module
-        t = str(m)[8:-2].replace('__main__.', '')  # module type
-        np = sum([x.numel() for x in m_.parameters()])  # number params
+        dups = [module(*args) for _ in range(number)]
+        seq = nn.Sequential(*dups) if number > 1 else module(*args)  # module
+
+        module_type = str(module)[8:-2].replace("__main__.", "")  # module type
+        np = sum([x.numel() for x in seq.parameters()])  # number params
+
         # attach index, 'from' index, type, number params
-        m_.i, m_.f, m_.type, m_.np = i, f, t, np
-        print('%3s%18s%3s%10.0f  %-40s%-30s' % (i, f, n, np, t, args))  # print
-        save.extend(x % i for x in ([f] if isinstance(
-            f, int) else f) if x != -1)  # append to savelist
-        layers.append(m_)
-        if m in [HarDBlock, HarDBlock2]:
-            c2 = m_.get_out_ch()
-            ch.append(c2)
-        else:
-            ch.append(c2)
+        seq.i = i
+        seq.f = _from
+        seq.type = module_type
+        seq.np = np
+
+        print_args = (i, _from, number, np, module_type, args)
+        print("%3s%18s%3s%10.0f  %-40s%-30s" % print_args)  # print
+
+        save.extend(x % i for x in ([_from] if isinstance(_from, int) else _from) if x != -1)  # append to savelist
+        layers.append(seq)
+
+        if module in case_1:
+            out_channel = seq.get_out_ch()
+        input_channels.append(out_channel)
+
     return nn.Sequential(*layers), sorted(save)

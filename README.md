@@ -45,13 +45,10 @@ https://developer.download.nvidia.com/compute/redist/cudnn/v8.4.0/local_installe
   ![image](https://user-images.githubusercontent.com/96072580/182018468-b0f1ecc6-8221-4a7f-9bfe-6084d03b197d.png)
 
 ```
-$ pylint --generated-members=cv2.*,torch.* semantic
-------------------------------------------------------------------
-Your code has been rated at 8.28/10 (previous run: 8.25/10, +0.02)
 
-$ pylint --generated-members=cv2.*,torch.* detect
+$ pylint --generated-members=cv2.*,torch.* app
 ------------------------------------------------------------------
-Your code has been rated at 6.31/10 (previous run: 6.15/10, +0.16)
+Your code has been rated at 6.40/10 (previous run: 5.44/10, +0.96)
 ```
 
 The project is fork https://github.com/ultralytics/yolov5
