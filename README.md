@@ -17,11 +17,11 @@ https://developer.download.nvidia.com/compute/redist/cudnn/v8.4.0/local_installe
   $ python -c "import torch;print(torch.cuda.is_available())"
 ```
 # Usage
-  Training
+  Training semantic segmentation
   ```
     $ python -m semantic.train --train ./train --valid ./valid --epochs 300 --name weights
   ```
-  Segmentation inference
+  Semantic segmentation inference
   ```
     $ python -m semantic.inference --input ./images --weights ./weights.ckpt
   ```
@@ -29,15 +29,11 @@ https://developer.download.nvidia.com/compute/redist/cudnn/v8.4.0/local_installe
   ```
     $ python -m detect.crop --images ./images --labels ./labels
   ```
-  Training from scratch
+  Training object detection
   ```
     $ python -m detect.train --data ./data/data.yaml --hyp ./data/hyp.scratch.yaml --epochs 300
   ```
-  Training for tune
-  ```
-    $ python -m detect.train --data ./data/data.yaml --hyp ./data/hyp.finetune.yaml --weights ./weights.pt --epochs 100
-  ```
-  Detection inference
+  Object detection inference
   ```
     $ python -m detect.inference --input ./images --output ./labels --weights ./weights.pt --save-img
   ```
