@@ -136,7 +136,7 @@ if __name__ == "__main__":
 
     parser.add_argument("--conf-thres",
                         type=float,
-                        default=0.7,
+                        default=0.4,
                         metavar="(.0-1.0)")
 
     parser.add_argument("--iou-thres",
