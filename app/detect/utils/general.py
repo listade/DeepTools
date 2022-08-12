@@ -53,9 +53,12 @@ def check_img_size(img_size, stride=32):
     """Verify img_size is a multiple of stride s"""
 
     new_size = make_divisible(img_size, int(stride))  # ceil gs-multiple
+
     if new_size != img_size:
-        args = (img_size, stride, new_size)
-        print('WARNING: --img-size %g must be multiple of max stride %g, updating to %g' % args)
+        print(f"WARNING: --img-size {img_size} \
+                must be multiple of max stride {stride}, \
+                updating to {new_size}")
+
     return new_size
 
 

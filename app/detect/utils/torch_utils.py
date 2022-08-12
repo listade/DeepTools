@@ -14,12 +14,9 @@ def init_seeds(seed=0):
     """Speed-reproducibility tradeoff https://pytorch.org/docs/stable/notes/randomness.html"""
 
     torch.manual_seed(seed)
-    if seed == 0:  # slower, more reproducible
-        cudnn.deterministic = True
-        cudnn.benchmark = False
-    else:  # faster, less reproducible
-        cudnn.deterministic = False
-        cudnn.benchmark = True
+
+    cudnn.deterministic = seed == 0
+    cudnn.benchmark = seed != 0
 
 
 def select_device(device, batch_size=1):
@@ -34,6 +31,7 @@ def select_device(device, batch_size=1):
         raise Exception(f"invalid device: {device}")
 
     # os.environ["CUDA_VISIBLE_DEVICES"] = device
+
     if not torch.cuda.is_available():
         raise Exception("cuda is unavailable")
 
