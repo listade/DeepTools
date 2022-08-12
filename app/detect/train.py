@@ -277,12 +277,12 @@ def train(hyp, opt, device, tb_writer=None):
                                                         nc=nc, 
                                                         class_weights=w)
 
-                dataset.indices = random.choices(range(dataset.n), 
+                dataset.indices = random.choices(range(dataset.img_num), 
                                                  weights=image_weights,
-                                                 k=dataset.n)  # rand weighted idx
+                                                 k=dataset.img_num)  # rand weighted idx
             # Broadcast if DDP
             if rank != -1:
-                indices = torch.zeros([dataset.n], dtype=torch.int)
+                indices = torch.zeros([dataset.img_num], dtype=torch.int)
                 if rank == 0:
                     indices[:] = torch.from_tensor(dataset.indices, 
                                                    dtype=torch.int)
