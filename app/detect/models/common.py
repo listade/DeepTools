@@ -144,8 +144,8 @@ class SPP(nn.Module):
 
 
 class SPPCSP(nn.Module):
-    # CSP SPP https://github.com/WongKinYiu/CrossStagePartialNetworks
-    def __init__(self, c1, c2, n=1, shortcut=False, g=1, e=0.5, k=(5, 9, 13)):
+    """CSP SPP https://github.com/WongKinYiu/CrossStagePartialNetworks"""
+    def __init__(self, c1, c2, _=1, __=False, ___=1, e=0.5, k=(5, 9, 13)):
         super(SPPCSP, self).__init__()
         c_ = int(2 * c2 * e)  # hidden channels
         self.cv1 = Conv(c1, c_, 1, 1)
@@ -164,18 +164,6 @@ class SPPCSP(nn.Module):
         y1 = self.cv6(self.cv5(torch.cat([x1] + [m(x1) for m in self.m], 1)))
         y2 = self.cv2(x)
         return self.cv7(self.act(self.bn(torch.cat((y1, y2), dim=1))))
-
-
-class MP(nn.Module):
-    """Spatial pyramid pooling layer used in YOLOv3-SPP"""
-
-    def __init__(self, k=2):
-        super().__init__()
-        self.m = nn.MaxPool2d(kernel_size=k, stride=k)
-
-    def forward(self, x):
-        """Run network"""
-        return self.m(x)
 
 
 class Focus(nn.Module):
@@ -204,33 +192,6 @@ class Concat(nn.Module):
     def forward(self, x):
         """Run network"""
         return torch.cat(x, self.d)
-
-
-class Flatten(nn.Module):
-    """Use after nn.AdaptiveAvgPool2d(1) to remove last 2 dimensions"""
-
-    @staticmethod
-    def forward(x):
-        """Run network"""
-        return x.view(x.size(0), -1)
-
-
-class Classify(nn.Module):
-    """Classification head, i.e. x(b,c1,20,20) to x(b,c2)
-       arguments: ch_in, ch_out, kernel, stride, padding, groups"""
-
-    def __init__(self, c1, c2, k=1, s=1, p=None, g=1):
-        super().__init__()
-        self.aap = nn.AdaptiveAvgPool2d(1)  # to x(b,c1,1,1)
-        self.conv = nn.Conv2d(c1, c2, k, s, autopad(
-            k, p), groups=g, bias=False)  # to x(b,c2,1,1)
-        self.flat = Flatten()
-
-    def forward(self, x):
-        """Run network"""
-        z = torch.cat([self.aap(y) for y in (
-            x if isinstance(x, list) else [x])], 1)  # cat if list
-        return self.flat(self.conv(z))  # flatten to x(b,c2)
 
 
 class CombConvLayer(nn.Sequential):

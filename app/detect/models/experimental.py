@@ -4,7 +4,7 @@ import numpy as np
 import torch
 from torch import nn
 
-from .common import Conv, dw_conv
+from .common import Conv
 
 
 class CrossConv(nn.Module):
@@ -33,7 +33,6 @@ class C3(nn.Module):
     """
 
     def __init__(self, c1, c2, n=1, shortcut=True, g=1, e=0.5):
-
         c_ = int(c2 * e)  # hidden channels
         self.cv1 = Conv(c1, c_, 1, 1)
         self.cv2 = nn.Conv2d(c1, c_, 1, 1, bias=False)
@@ -54,31 +53,6 @@ class C3(nn.Module):
         return self.cv4(self.act(self.bn(torch.cat((y1, y2), dim=1))))
 
 
-class Sum(nn.Module):
-    """Weighted sum of 2 or more layers https://arxiv.org/abs/1911.09070"""
-
-    def __init__(self, n, weight=False):  # n: number of inputs
-        self.weight = weight  # apply weights boolean
-        self.iter = range(n - 1)  # iter object
-        if weight:
-            self.w = nn.Parameter(-torch.arange(1., n) / 2,
-                                  requires_grad=True)  # layer weights
-        super().__init__()
-
-    def forward(self, x):
-        """Forward"""
-
-        y = x[0]  # no weight
-        if self.weight:
-            w = torch.sigmoid(self.w) * 2
-            for i in self.iter:
-                y = y + x[i + 1] * w[i]
-        else:
-            for i in self.iter:
-                y = y + x[i + 1]
-        return y
-
-
 class GhostConv(nn.Module):
     """
         Ghost Convolution https://github.com/huawei-noah/ghostnet
@@ -97,24 +71,6 @@ class GhostConv(nn.Module):
 
         y = self.cv1(x)
         return torch.cat([y, self.cv2(y)], 1)
-
-
-class GhostBottleneck(nn.Module):
-    """Ghost Bottleneck https://github.com/huawei-noah/ghostnet"""
-
-    def __init__(self, c1, c2, k, s):
-        super(GhostBottleneck, self).__init__()
-        c_ = c2 // 2
-        self.conv = nn.Sequential(GhostConv(c1, c_, 1, 1),  # pw
-                                  dw_conv(
-                                      c_, c_, k, s, act=False) if s == 2 else nn.Identity(),  # dw
-                                  GhostConv(c_, c2, 1, 1, act=False))  # pw-linear
-        self.shortcut = nn.Sequential(dw_conv(c1, c1, k, s, act=False),
-                                      Conv(c1, c2, 1, 1, act=False)) if s == 2 else nn.Identity()
-
-    def forward(self, x):
-        """Forward"""
-        return self.conv(x) + self.shortcut(x)
 
 
 class MixConv2d(nn.Module):

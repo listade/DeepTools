@@ -4,7 +4,7 @@ import math
 from copy import deepcopy
 from pathlib import Path
 
-import cv2
+# import cv2
 import torch
 import yaml
 from torch import nn
