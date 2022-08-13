@@ -51,19 +51,23 @@ class LoadImagesAndLabels(Dataset):
             if os.path.isfile(p):  # file
                 with open(p, "r", encoding="utf-8") as f:
                     lines = f.read().splitlines()
-                    files += [x.replace("./", parent) if x.startswith("./") else x for x in lines] # local to global path
+                    # local to global path
+                    files += [x.replace("./", parent)
+                              if x.startswith("./") else x for x in lines]
 
-            elif os.path.isdir(p): # folder
+            elif os.path.isdir(p):  # folder
                 files += glob.iglob(p + os.sep + "*.*")
             else:
                 raise Exception(f"{p} does not exist")
 
-        self.img_files = sorted([x.replace('/', os.sep) for x in files if os.path.splitext(x)[-1].lower() in img_formats])
+        self.img_files = sorted([x.replace(
+            '/', os.sep) for x in files if os.path.splitext(x)[-1].lower() in img_formats])
         img_files_count = len(self.img_files)
 
         assert img_files_count > 0, f"No images found in {path}"
 
-        batch_index = np.floor(np.arange(img_files_count) / batch_size).astype(np.int)  # batch index
+        batch_index = np.floor(
+            np.arange(img_files_count) / batch_size).astype(np.int)  # batch index
         batches_num = batch_index[-1] + 1  # number of batches
 
         self.img_num = img_files_count  # number of images
@@ -80,7 +84,8 @@ class LoadImagesAndLabels(Dataset):
         self.stride = stride
 
         # Define labels
-        self.label_files = [x.replace('images', 'labels').replace(os.path.splitext(x)[-1], '.txt') for x in self.img_files]
+        self.label_files = [x.replace('images', 'labels').replace(
+            os.path.splitext(x)[-1], '.txt') for x in self.img_files]
 
         # Check cache
         cache_path = str(Path(self.label_files[0]).parent) + '.cache'
@@ -123,10 +128,11 @@ class LoadImagesAndLabels(Dataset):
                 np.array(shapes) * img_size / stride + pad).astype(np.int) * stride
 
         # Cache labels
-        create_datasubset, extract_bounding_boxes, labels_loaded = False, False, False
+        create_datasubset, extract_bounding_boxes, _ = False, False, False
         # number missing, found, empty, datasubset, duplicate
         nm, nf, ne, ns, nd = 0, 0, 0, 0, 0
         pbar = tqdm(self.label_files)
+        file = ""
         for i, file in enumerate(pbar):
             l = self.labels[i]  # label
             if l.shape[0]:
@@ -151,7 +157,7 @@ class LoadImagesAndLabels(Dataset):
                     if exclude_classes not in l[:, 0]:
                         ns += 1
                         # shutil.copy(src=self.img_files[i], dst='./datasubset/images/')  # copy image
-                        with open('./datasubset/images.txt', 'a') as files:
+                        with open('./datasubset/images.txt', 'a', encoding="utf-8") as files:
                             files.write(self.img_files[i] + '\n')
 
                 # Extract object detection boxes for a second stage classifier
@@ -194,7 +200,8 @@ class LoadImagesAndLabels(Dataset):
         if cache_images:
             gb = 0  # Gigabytes of cached images
             pbar = tqdm(range(len(self.img_files)), desc='Caching images')
-            self.img_hw0, self.img_hw = [None] * img_files_count, [None] * img_files_count
+            self.img_hw0, self.img_hw = [None] * \
+                img_files_count, [None] * img_files_count
             for i in pbar:  # max 10k images
                 self.imgs[i], self.img_hw0[i], self.img_hw[i] = self.load_image(
                     i)  # img, hw_original, hw_resized
@@ -215,13 +222,13 @@ class LoadImagesAndLabels(Dataset):
                 shape = exif_size(image)  # image size
                 assert (shape[0] > 9) & (shape[1] > 9), 'image size <10 pixels'
                 if os.path.isfile(label):
-                    with open(label, 'r') as f:
+                    with open(label, "r", encoding="utf-8") as f:
                         l = np.array(
                             [x.split() for x in f.read().splitlines()], dtype=np.float32)  # labels
                 if len(l) == 0:
                     l = np.zeros((0, 5), dtype=np.float32)
                 x[img] = [l, shape]
-            except Exception as e:
+            except RuntimeError as e:
                 x[img] = None
                 print('WARNING: %s: %s' % (img, e))
 
@@ -233,19 +240,19 @@ class LoadImagesAndLabels(Dataset):
         return len(self.img_files)
 
     def __getitem__(self, index):
-        if self.image_weights:
-            index = self.indices[index]
+        # if self.image_weights:
+        #     index = self.indices[index]
 
         hyp = self.hyp
         if self.mosaic:
             # Load mosaic
-            img, labels = load_mosaic(self, index)
+            img, labels = self.load_mosaic(index)
             shapes = None
 
             # MixUp https://arxiv.org/pdf/1710.09412.pdf
             if random.random() < hyp['mixup']:
-                img2, labels2 = load_mosaic(
-                    self, random.randint(0, len(self.labels) - 1))
+                img2, labels2 = self.load_mosaic(
+                    random.randint(0, len(self.labels) - 1))
                 r = np.random.beta(8.0, 8.0)  # mixup ratio, alpha=beta=8.0
                 img = (img * r + img2 * (1 - r)).astype(np.uint8)
                 labels = np.concatenate((labels, labels2), 0)
@@ -573,20 +580,20 @@ def get_hash(files):
 
 
 def exif_size(img):
-    """ Returns exif-corrected PIL size"""
-
+    """Returns exif-corrected PIL size"""
+    k = 0
     for k, v in ExifTags.TAGS.items():
         if v == 'Orientation':
             break
 
     wh = img.size  # (width, height)
     try:
-        rotation = dict(img._getexif().items())[k]
+        rotation = img.getexif().get(k)
         if rotation == 6:
             return wh[1], wh[0]  # rotation 270
         if rotation == 8:
             return wh[1], wh[0]  # rotation 90
-    except Exception as e:
+    except RuntimeError as e:
         print(e)
 
     return wh

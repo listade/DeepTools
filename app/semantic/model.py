@@ -27,10 +27,10 @@ class SegModel(pl.LightningModule):
         self.loss_fn = smp.losses.DiceLoss(
             smp.losses.BINARY_MODE, from_logits=True)
 
-    def forward(self, image):
+    def forward(self, *args, **kwargs):
         # normalize image here
         # image = (image - self.mean) / self.std
-        mask = self.model(image)
+        mask = self.model(args[0])
         return mask
 
     def shared_step(self, batch, _):
@@ -111,20 +111,20 @@ class SegModel(pl.LightningModule):
 
         self.log_dict(metrics, prog_bar=True)
 
-    def training_step(self, batch, _):
-        return self.shared_step(batch, "train")
+    def training_step(self, *args, **kwargs):
+        return self.shared_step(args[0], "train")
 
     def training_epoch_end(self, outputs):
         return self.shared_epoch_end(outputs, "train")
 
-    def validation_step(self, batch, _):
-        return self.shared_step(batch, "valid")
+    def validation_step(self, *args, **kwargs):
+        return self.shared_step(args[0], "valid")
 
     def validation_epoch_end(self, outputs):
         return self.shared_epoch_end(outputs, "valid")
 
-    def test_step(self, batch, _):
-        return self.shared_step(batch, "test")
+    def test_step(self, *args, **kwargs):
+        return self.shared_step(args[0], "test")
 
     def test_epoch_end(self, outputs):
         return self.shared_epoch_end(outputs, "test")

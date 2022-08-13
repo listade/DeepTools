@@ -219,7 +219,7 @@ class Model(nn.Module):
 
         for m in self.model.modules():
             if isinstance(m, Conv):
-                m._non_persistent_buffers_set = set()  # pytorch 1.6.0 compatability
+                # m._non_persistent_buffers_set = set()  # pytorch 1.6.0 compatability
                 m.conv = fuse_conv_and_bn(m.conv, m.bn)  # update conv
                 m.bn = None  # remove batchnorm
                 m.forward = m.fuseforward  # update forward

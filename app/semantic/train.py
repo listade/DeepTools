@@ -87,54 +87,54 @@ class Dataset(IterableDataset):
         raise NotImplementedError()
 
 
-def main(opt):
+def main(args):
     """Module entry point"""
 
-    train_dataset = Dataset(path=opt.train,
-                            width=opt.img_size,
-                            overlap=opt.overlap,
-                            shrink=opt.shrink,
-                            fill=opt.fill,
-                            encoder=opt.encoder,
-                            encoder_weights=opt.encoder_weights,
+    train_dataset = Dataset(path=args.train,
+                            width=args.img_size,
+                            overlap=args.overlap,
+                            shrink=args.shrink,
+                            fill=args.fill,
+                            encoder=args.encoder,
+                            encoder_weights=args.encoder_weights,
                             augment=get_training_augmentation())
 
-    valid_dataset = Dataset(path=opt.valid,
-                            width=opt.img_size,
-                            overlap=opt.overlap,
-                            shrink=opt.shrink,
-                            fill=opt.fill,
-                            encoder=opt.encoder,
-                            encoder_weights=opt.encoder_weights,
+    valid_dataset = Dataset(path=args.valid,
+                            width=args.img_size,
+                            overlap=args.overlap,
+                            shrink=args.shrink,
+                            fill=args.fill,
+                            encoder=args.encoder,
+                            encoder_weights=args.encoder_weights,
                             augment=get_validation_augmentation())
 
     train_loader = DataLoader(train_dataset,
-                              batch_size=opt.batch_size,
-                              num_workers=opt.workers)
+                              batch_size=args.batch_size,
+                              num_workers=args.workers)
 
     valid_loader = DataLoader(valid_dataset,
-                              batch_size=opt.batch_size,
-                              num_workers=opt.workers)
+                              batch_size=args.batch_size,
+                              num_workers=args.workers)
 
     checkpoint = ModelCheckpoint(save_top_k=1,
                                  every_n_epochs=1,
                                  monitor="valid_dataset_iou",
                                  mode="max",
                                  dirpath=".",
-                                 filename=opt.name)
+                                 filename=args.name)
 
-    gpus = 1 if opt.device == "cuda" else None
+    gpus = 1 if args.device == "cuda" else None
 
     trainer = pl.Trainer(gpus=gpus,
-                         max_epochs=opt.epochs,
+                         max_epochs=args.epochs,
                          callbacks=[checkpoint])
 
-    device = torch.device(opt.device)
+    device = torch.device(args.device)
 
-    model = SegModel(opt.arch,
-                     opt.encoder,
+    model = SegModel(args.arch,
+                     args.encoder,
                      in_channels=3,
-                     out_classes=opt.nc)
+                     out_classes=args.nc)
     model.to(device)
 
     trainer.fit(model.to(device),
@@ -145,27 +145,80 @@ def main(opt):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
 
-    parser.add_argument("--train", type=str, default="train",
+    parser.add_argument("--train",
+                        type=str,
+                        default="train",
                         metavar="<path-to-images>")
-    parser.add_argument("--valid", type=str, default="valid",
-                        metavar="<path-to-images>")
-    parser.add_argument("--nc", type=int, default=1, metavar="<classes>")
-    parser.add_argument("--name", type=str, default="weights", metavar="<str>")
-    parser.add_argument("--batch-size", type=int, default=4, metavar="<int>")
-    parser.add_argument("--device", type=str,
-                        default="cuda", metavar="<cuda|cpu>")
-    parser.add_argument("--epochs", type=int, default=300, metavar="<int>")
-    parser.add_argument("--arch", type=str,
-                        default="UnetPlusPlus", metavar="<str>")
-    parser.add_argument("--encoder", type=str,
-                        default="resnext50_32x4d", metavar="<str>")
-    parser.add_argument("--encoder-weights", type=str,
-                        default="imagenet", metavar="<str>")
-    parser.add_argument("--img-size", type=int, default=640, metavar="<px>")
-    parser.add_argument("--overlap", type=int, default=100, metavar="<px>")
-    parser.add_argument("--shrink", type=float,
-                        default=0.85, metavar="<0-1.0>")
-    parser.add_argument("--fill", type=float, default=0.05, metavar="<0-1.0>")
-    parser.add_argument("--workers", type=int, default=4, metavar="<int>")
 
-    main(parser.parse_args())
+    parser.add_argument("--valid",
+                        type=str,
+                        default="valid",
+                        metavar="<path-to-images>")
+
+    parser.add_argument("--nc",
+                        type=int,
+                        default=1,
+                        metavar="<classes>")
+
+    parser.add_argument("--name",
+                        type=str,
+                        default="weights",
+                        metavar="<str>")
+
+    parser.add_argument("--batch-size",
+                        type=int,
+                        default=4,
+                        metavar="<int>")
+
+    parser.add_argument("--device",
+                        type=str,
+                        default="cuda",
+                        metavar="<cuda|cpu>")
+
+    parser.add_argument("--epochs",
+                        type=int,
+                        default=300,
+                        metavar="<int>")
+
+    parser.add_argument("--arch",
+                        type=str,
+                        default="UnetPlusPlus",
+                        metavar="<str>")
+
+    parser.add_argument("--encoder",
+                        type=str,
+                        default="resnext50_32x4d",
+                        metavar="<str>")
+
+    parser.add_argument("--encoder-weights",
+                        type=str,
+                        default="imagenet",
+                        metavar="<str>")
+
+    parser.add_argument("--img-size",
+                        type=int,
+                        default=640,
+                        metavar="<px>")
+
+    parser.add_argument("--overlap",
+                        type=int,
+                        default=100,
+                        metavar="<px>")
+
+    parser.add_argument("--shrink",
+                        type=float,
+                        default=0.85,
+                        metavar="<0-1.0>")
+
+    parser.add_argument("--fill",
+                        type=float,
+                        default=0.05,
+                        metavar="<0-1.0>")
+
+    parser.add_argument("--workers",
+                        type=int,
+                        default=4,
+                        metavar="<int>")
+
+    opt = parser.parse_args()
+    main(opt)

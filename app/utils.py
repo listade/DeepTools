@@ -29,12 +29,12 @@ def xy_to_lonlat(x, y, width, heigth, clon, clat, m_px, yaw=.0):
 
     x, y = rotate(x, y, np.deg2rad(yaw))
 
-    m_ox, m_oy = pyproj.transform(epsg, merc, clon, clat)
+    m_ox, m_oy = tuple(pyproj.transform(epsg, merc, clon, clat))
 
     mx = x * m_px + m_ox
     my = y * m_px + m_oy
 
-    lon, lat = pyproj.transform(merc, epsg, mx, my)
+    lon, lat = tuple(pyproj.transform(merc, epsg, mx, my))
 
     return lon, lat
 
@@ -45,8 +45,8 @@ def lonlat_to_xy(lon, lat, clon, clat, m_px):
     epsg = pyproj.Proj(init="epsg:4326")
     merc = pyproj.Proj(init="epsg:3857")
 
-    m_ox, m_oy = pyproj.transform(epsg, merc, clon, clat)
-    mx, my = pyproj.transform(epsg, merc, lon, lat)
+    m_ox, m_oy = tuple(pyproj.transform(epsg, merc, clon, clat))
+    mx, my = tuple(pyproj.transform(epsg, merc, lon, lat))
 
     return int((mx - m_ox) / m_px), int((my - m_oy) / m_px)
 
@@ -299,15 +299,15 @@ def get_focal_len(path):
     """Returns focal length from image exif"""
 
     with PIL.Image.open(path) as f:
-        return f._getexif()[0x920A]
+        return f.getexif().get(0x920A)
 
 
 def get_lat_lon_alt(path):
     """Returns image lat, lon and alt from exif"""
 
     with PIL.Image.open(path) as f:
-        exif = f._getexif()
-        geo = exif[0x8825]
+        exif = f.getexif()
+        geo = exif.get(0x8825)
         return geo[2], geo[4], geo[6]
 
 

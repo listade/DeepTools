@@ -1,4 +1,4 @@
-"""Utils functions"""
+"""This module contains general util functions"""
 
 import glob
 import math
@@ -22,9 +22,14 @@ from tqdm import tqdm
 from .torch_utils import is_parallel
 
 # Set printoptions
-torch.set_printoptions(linewidth=320, precision=5, profile='long')
+torch.set_printoptions(linewidth=320,
+                       precision=5,
+                       profile='long')
+
 # format short g, %precision=5
-np.set_printoptions(linewidth=320, formatter={'float_kind': '{:11.5g}'.format})
+np.set_printoptions(linewidth=320,
+                    formatter={'float_kind': '{:11.5g}'.format})
+
 matplotlib.rc('font', **{'size': 11})
 
 # Prevent OpenCV from multithreading (to use PyTorch DataLoader)
@@ -87,7 +92,8 @@ def check_anchors(dataset, model, thr=4.0, imgsz=640):
           (aat, bpr), end="")
 
     if bpr < 0.98:  # threshold to recompute
-        print(". Attempting to generate improved anchors, please wait..." % bpr)
+        print(
+            f". Attempting to generate improved anchors, please wait...{bpr}")
         na = m.anchor_grid.numel() // 2  # number of anchors
         new_anchors = kmean_anchors(
             dataset, n=na, img_size=imgsz, thr=thr, gen=1000, verbose=False)
@@ -432,10 +438,10 @@ def compute_loss(p, targets, model):
 
     # Losses
     nt = 0  # number of targets
-    np = len(p)  # number of outputs
-    balance = [4.0, 1.0, 0.4] if np == 3 else [
+    ouputs_num = len(p)  # number of outputs
+    balance = [4.0, 1.0, 0.4] if ouputs_num == 3 else [
         4.0, 1.0, 0.4, 0.1]  # P3-5 or P3-6
-    balance = [4.0, 1.0, 0.5, 0.4, 0.1] if np == 5 else balance
+    balance = [4.0, 1.0, 0.5, 0.4, 0.1] if ouputs_num == 5 else balance
     for i, pi in enumerate(p):  # layer index, layer predictions
         b, a, gj, gi = indices[i]  # image, anchor, gridy, gridx
         tobj = torch.zeros_like(pi[..., 0], device=device)  # target obj
@@ -463,9 +469,9 @@ def compute_loss(p, targets, model):
 
         lobj += bce_obj(pi[..., 4], tobj) * balance[i]  # obj loss
 
-    s = 3 / np  # output count scaling
+    s = 3 / ouputs_num  # output count scaling
     lbox *= h['giou'] * s
-    lobj *= h['obj'] * s * (1.4 if np >= 4 else 1.)
+    lobj *= h['obj'] * s * (1.4 if ouputs_num >= 4 else 1.)
     lcls *= h['cls'] * s
     bs = tobj.shape[0]  # batch size
 
@@ -549,7 +555,7 @@ def non_max_suppression(prediction, conf_thres=0.1, iou_thres=0.6, merge=False, 
 
     # Settings
     # (pixels) minimum and maximum box width and height
-    min_wh, max_wh = 2, 4096
+    _, max_wh = 2, 4096
     max_det = 300  # maximum number of detections per image
     time_limit = 10.0  # seconds to quit after
     redundant = True  # require redundant detections
@@ -606,7 +612,7 @@ def non_max_suppression(prediction, conf_thres=0.1, iou_thres=0.6, merge=False, 
                 ) / weights.sum(1, keepdim=True)  # merged boxes
                 if redundant:
                     i = i[iou.sum(1) > 1]  # require redundancy
-            except Exception as e:  # possible CUDA error https://github.com/ultralytics/yolov3/issues/1139
+            except RuntimeError as e:  # possible CUDA error https://github.com/ultralytics/yolov3/issues/1139
                 print(e, x, i, x.shape, i.shape)
 
         output[xi] = x[i]
@@ -658,7 +664,7 @@ def kmean_anchors(path='./data/coco128.yaml', n=9, img_size=640, thr=4.0, gen=10
         # x = wh_iou(wh, torch.tensor(k))  # iou metric
         return x, x.max(1)[0]  # x, best_x
 
-    def fitness(k):  # mutation fitness
+    def _fitness(k):  # mutation fitness
         _, best = metric(torch.tensor(k, dtype=torch.float32), wh)
         return (best * (best > thr).float()).mean()  # fitness
 
@@ -677,11 +683,12 @@ def kmean_anchors(path='./data/coco128.yaml', n=9, img_size=640, thr=4.0, gen=10
         return k
 
     if isinstance(path, str):  # *.yaml file
-        with open(path) as f:
+        with open(path, encoding="utf-8") as f:
             data_dict = yaml.load(f, Loader=yaml.FullLoader)  # model dict
-        from utils.datasets import LoadImagesAndLabels
-        dataset = LoadImagesAndLabels(
-            data_dict['train'], augment=True, rect=True)
+        from .datasets import LoadImagesAndLabels
+        dataset = LoadImagesAndLabels(data_dict["train"],
+                                      augment=True,
+                                      rect=True)
     else:
         dataset = path  # dataset
 
@@ -700,7 +707,7 @@ def kmean_anchors(path='./data/coco128.yaml', n=9, img_size=640, thr=4.0, gen=10
     # Kmeans calculation
     print('Running kmeans for %g anchors on %g points...' % (n, len(wh)))
     s = wh.std(0)  # sigmas for whitening
-    k, dist = kmeans(wh / s, n, iter=30)  # points, mean distance
+    k, _ = kmeans(wh / s, n, iter=30)  # points, mean distance
     k *= s
     wh = torch.tensor(wh, dtype=torch.float32)  # filtered
     wh0 = torch.tensor(wh0, dtype=torch.float32)  # unflitered
@@ -709,7 +716,7 @@ def kmean_anchors(path='./data/coco128.yaml', n=9, img_size=640, thr=4.0, gen=10
     # Evolve
     npr = np.random
     # fitness, generations, mutation prob, sigma
-    f, sh, mp, s = fitness(k), k.shape, 0.9, 0.1
+    f, sh, mp, s = _fitness(k), k.shape, 0.9, 0.1
     # progress bar
     pbar = tqdm(range(gen), desc='Evolving anchors with Genetic Algorithm')
     for _ in pbar:
@@ -718,7 +725,7 @@ def kmean_anchors(path='./data/coco128.yaml', n=9, img_size=640, thr=4.0, gen=10
             v = ((npr.random(sh) < mp) * npr.random() *
                  npr.randn(*sh) * s + 1).clip(0.3, 3.0)
         kg = (k.copy() * v).clip(min=2.0)
-        fg = fitness(kg)
+        fg = _fitness(kg)
         if fg > f:
             f, k = fg, kg.copy()
             pbar.desc = 'Evolving anchors with Genetic Algorithm: fitness = %.4f' % f
@@ -738,18 +745,20 @@ def print_mutation(hyp, results, yaml_file='hyp_evolved.yaml'):
 
     print('\n%s\n%s\nEvolved fitness: %s\n' % (a, b, c))
 
-    with open('evolve.txt', 'a') as f:  # append result
+    with open("evolve.txt", "a", encoding="utf-8") as f:  # append result
         f.write(c + b + '\n')
+
     x = np.unique(np.loadtxt('evolve.txt', ndmin=2),
                   axis=0)  # load unique rows
     x = x[np.argsort(-fitness(x))]  # sort
+
     np.savetxt('evolve.txt', x, '%10.3g')  # save sort by fitness
 
     # Save yaml
     for i, k in enumerate(hyp.keys()):
         hyp[k] = float(x[0, i + 7])
 
-    with open(yaml_file, 'w') as f:
+    with open(yaml_file, "w", encoding="utf-8") as f:
         results = tuple(x[0, :7])
         # results (P, R, mAP@0.5, mAP@0.5:0.95, val_losses x 3)
         c = '%10.4g' * len(results) % results
@@ -787,17 +796,17 @@ def output_to_target(output, width, height):
     return np.array(targets)
 
 
-def increment_dir(dir, comment=""):
+def increment_dir(path, comment=""):
     """Increments a directory runs/exp1 --> runs/exp2_comment"""
 
     n = 0  # number
-    dir = str(Path(dir))  # os-agnostic
-    d = sorted(glob.glob(dir + "*"))  # directories
+    path = str(Path(path))  # os-agnostic
+    d = sorted(glob.glob(path + "*"))  # directories
     if len(d):
-        n = max([int(x[len(dir):x.find("_") if "_" in x else None])
+        n = max([int(x[len(path):x.find("_") if "_" in x else None])
                 for x in d]) + 1  # increment
 
-    return dir + str(n) + ("_" + comment if comment else "")
+    return path + str(n) + ("_" + comment if comment else "")
 
 
 # Plotting functions ---------------------------------------------------------------------------------------------------
@@ -925,7 +934,7 @@ def plot_labels(labels, save_dir=''):
     c, b = labels[:, 0], labels[:, 1:].transpose()  # classes, boxes
     nc = int(c.max() + 1)  # number of classes
 
-    fig, ax = plt.subplots(2, 2, figsize=(8, 8), tight_layout=True)
+    _, ax = plt.subplots(2, 2, figsize=(8, 8), tight_layout=True)
     ax = ax.ravel()
     ax[0].hist(c, bins=np.linspace(0, nc, nc + 1) - 0.5, rwidth=0.8)
     ax[0].set_xlabel('classes')
@@ -942,14 +951,14 @@ def plot_labels(labels, save_dir=''):
 def plot_evolution(yaml_file='runs/evolve/hyp_evolved.yaml'):
     """Plot hyperparameter evolution results in evolve.txt"""
 
-    with open(yaml_file) as f:
+    with open(yaml_file, encoding="utf-8") as f:
         hyp = yaml.load(f, Loader=yaml.FullLoader)
     x = np.loadtxt('evolve.txt', ndmin=2)
     f = fitness(x)
     # weights = (f - f.min()) ** 2  # for weighted results
     plt.figure(figsize=(10, 10), tight_layout=True)
     matplotlib.rc('font', **{'size': 8})
-    for i, (k, v) in enumerate(hyp.items()):
+    for i, (k, _) in enumerate(hyp.items()):
         y = x[:, i + 7]
         # mu = (y * weights).sum() / weights.sum()  # best weighted result
         mu = y[f.argmax()]  # best single result
@@ -966,7 +975,7 @@ def plot_evolution(yaml_file='runs/evolve/hyp_evolved.yaml'):
     print('\nPlot saved as evolve.png')
 
 
-def plot_results(start=0, stop=0, bucket='', id=(), labels=(), save_dir=''):
+def plot_results(start=0, stop=0, bucket='', _id=(), labels=(), save_dir=''):
     """Plot training 'results*.txt' as seen in https://github.com/ultralytics/yolov3"""
 
     fig, ax = plt.subplots(2, 5, figsize=(12, 6))
@@ -976,29 +985,24 @@ def plot_results(start=0, stop=0, bucket='', id=(), labels=(), save_dir=''):
     if bucket:
         os.system('rm -rf storage.googleapis.com')
         files = ['https://storage.googleapis.com/%s/results%g.txt' %
-                 (bucket, x) for x in id]
+                 (bucket, x) for x in _id]
     else:
         files = glob.glob(str(Path(save_dir) / 'results*.txt')) + \
-            glob.glob('../../Downloads/results*.txt')
+            glob.glob('../../Downloads/results*.txt')  # [!]
     for fi, f in enumerate(files):
-        try:
-            results = np.loadtxt(
-                f, usecols=[2, 3, 4, 8, 9, 12, 13, 14, 10, 11], ndmin=2).T
-            n = results.shape[1]  # number of rows
-            x = range(start, min(stop, n) if stop else n)
-            for i in range(10):
-                y = results[i, x]
-                if i in [0, 1, 2, 5, 6, 7]:
-                    y[y == 0] = np.nan  # dont show zero loss values
-                    # y /= y[0]  # normalize
-                label = labels[fi] if len(labels) > 0 else Path(f).stem
-                ax[i].plot(x, y, marker='.', label=label,
-                           linewidth=2, markersize=8)
-                ax[i].set_title(s[i])
-
-        except Exception as e:
-            print(e)
-            print('Warning: Plotting error for %s, skipping file' % f)
+        results = np.loadtxt(
+            f, usecols=[2, 3, 4, 8, 9, 12, 13, 14, 10, 11], ndmin=2).T
+        n = results.shape[1]  # number of rows
+        x = range(start, min(stop, n) if stop else n)
+        for i in range(10):
+            y = results[i, x]
+            if i in [0, 1, 2, 5, 6, 7]:
+                y[y == 0] = np.nan  # dont show zero loss values
+                # y /= y[0]  # normalize
+            label = labels[fi] if len(labels) > 0 else Path(f).stem
+            ax[i].plot(x, y, marker='.', label=label,
+                       linewidth=2, markersize=8)
+            ax[i].set_title(s[i])
 
     fig.tight_layout()
     ax[1].legend()
