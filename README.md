@@ -1,3 +1,5 @@
+The YOLO project fork (https://github.com/ultralytics/yolov5)
+
 # Install
 
 Python 3.7.9
@@ -17,30 +19,30 @@ https://developer.download.nvidia.com/compute/redist/cudnn/v8.4.0/local_installe
   $ python -c "import torch;print(torch.cuda.is_available())"
 ```
 # Usage
-  Training semantic segmentation
+   Object detection
   ```
-    $ python -m semantic.train --train ./train --valid ./valid --epochs 300 --name weights
+    $ python -m detect.inference --input ./images --weights ./best.pt --cfg cfg/yolov4-p5.yaml --save-img 
   ```
-  Semantic segmentation inference
+  Semantic segmentation
   ```
-    $ python -m semantic.inference --input ./images --weights ./weights.ckpt
+    $ python -m semantic.inference --input ./images --weights ./best.ckpt
   ```
-  Training object detection
+  Train object detection
   ```
-    $ python -m detect.train --data ./data/data.yaml --hyp ./data/hyp.scratch.yaml --epochs 300
+    $ python -m detect.train --data ./data/data.yaml --hyp ./data/hyp.scratch.yaml
   ```
-  Object detection inference
+  Train semantic segmentation
   ```
-    $ python -m detect.inference --input ./images --output ./labels --weights ./weights.pt --save-img
+    $ python -m semantic.train --train ./train --valid ./valid --name weights
   ```
-  
+
   ![image](https://user-images.githubusercontent.com/96072580/182018468-b0f1ecc6-8221-4a7f-9bfe-6084d03b197d.png)
 
 ```
 
 $ pylint --generated-members=cv2.*,torch.* app
 ------------------------------------------------------------------
-Your code has been rated at 6.40/10 (previous run: 5.44/10, +0.96)
+Your code has been rated at 7.06/10 (previous run: 7.13/10, -0.07)
 ```
 
-The project is fork https://github.com/ultralytics/yolov5
+
