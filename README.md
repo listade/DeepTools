@@ -33,7 +33,7 @@ https://developer.download.nvidia.com/compute/redist/cudnn/v8.4.0/local_installe
   ```
   Train semantic segmentation
   ```
-    $ python -m semantic.train --train ./train --valid ./valid --epochs 300 --name weights
+    $ python -m semantic.train --train ./train --valid ./valid --name weights
   ```
 
   ![image](https://user-images.githubusercontent.com/96072580/182018468-b0f1ecc6-8221-4a7f-9bfe-6084d03b197d.png)
