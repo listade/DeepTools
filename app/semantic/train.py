@@ -1,4 +1,4 @@
-"""Semantic inference training module"""
+"""This module runs semantic training process"""
 
 import argparse
 import glob

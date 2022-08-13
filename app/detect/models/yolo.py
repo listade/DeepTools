@@ -22,9 +22,10 @@ class Detect(nn.Module):
     """YOLO Detect nn.Dodule"""
 
     def __init__(self, nc=80, anchors=(), channels=()):  # detection layer
+        super().__init__()
 
         self.stride = ()  # strides computed during build
-        self.classes_num = nc
+        self.nc = nc
         self.no = nc + 5  # number of outputs per anchor
         self.nl = len(anchors)  # number of detection layers
         self.na = len(anchors[0]) // 2  # number of anchors
@@ -32,17 +33,15 @@ class Detect(nn.Module):
         self.grid = [torch.zeros(1)] * self.nl  # init grid
 
         t1 = torch.tensor(anchors).float().view(self.nl, -1, 2) # shape(nl,na,2)
-        self.register_buffer('anchors', t1)
-
         t2 = t1.clone().view(self.nl, 1, -1, 1, 1, 2) # shape(nl,1,na,1,1,2)
-        self.register_buffer('anchor_grid', t2)
 
         out_ch = self.no * self.na
         convs = (nn.Conv2d(in_ch, out_ch, 1) for in_ch in channels)
 
         self.m = nn.ModuleList(convs)  # output conv
 
-        super().__init__()
+        self.register_buffer('anchors', t1)
+        self.register_buffer('anchor_grid', t2)
 
     def forward(self, x):
         """Inference"""
@@ -87,6 +86,8 @@ class Model(nn.Module):
     """args: model, input channels, number of classes"""
 
     def __init__(self, cfg='yolov4-p5.yaml', ch=3, nc=None):
+        super().__init__()
+
         if isinstance(cfg, dict):
             self.yaml = cfg
         else:
@@ -122,7 +123,6 @@ class Model(nn.Module):
         initialize_weights(self)
         self.info()
 
-        super().__init__()
 
     def forward(self, x, augment=False, profile=False):
         """Forward"""
@@ -140,8 +140,8 @@ class Model(nn.Module):
                 # forward augmented
                 y = self.forward_once(sc_img)[0]
 
-                np_sc_img = 255 * sc_img[0].cpu().numpy().transpose((1, 2, 0))[:, :, ::-1]
-                cv2.imwrite(f"img_{sc_val}.jpg", np_sc_img)
+                # np_sc_img = 255 * sc_img[0].cpu().numpy().transpose((1, 2, 0))[:, :, ::-1]
+                # cv2.imwrite(f"img_{sc_val}.jpg", np_sc_img)
 
                 y[..., :4] /= sc_val  # unscale
 
@@ -229,19 +229,19 @@ class Model(nn.Module):
 
     def info(self):
         """Print model information"""
-        model_info(self, verbose=True)
+        model_info(self, verbose=False)
 
 
 def parse_model(model_dict, input_channels):  # model_dict, input_channels(3)
     """Parse model"""
 
     anchors = model_dict['anchors']
-    classes_num = model_dict['nc']
+    nc = model_dict['nc']
     depth_multiple = model_dict['depth_multiple']
     width_multiple = model_dict['width_multiple']
 
     anchors_num = (len(anchors[0]) // 2) if isinstance(anchors, list) else anchors
-    outputs_num = anchors_num * (classes_num + 5)
+    outputs_num = anchors_num * (nc + 5)
 
     layers = []  # layers
     save = []  # savelist
@@ -256,7 +256,10 @@ def parse_model(model_dict, input_channels):  # model_dict, input_channels(3)
         module = eval(module) if isinstance(module, str) else module  # eval strings
 
         for j, arg in enumerate(args):
-            args[j] = eval(arg) if isinstance(arg, str) else arg  # eval strings
+            try:
+                args[j] = eval(arg) if isinstance(arg, str) else arg  # eval strings
+            except NameError:
+                pass
 
         number = max(round(number * depth_multiple), 1) if number > 1 else number  # depth gain
 

@@ -682,15 +682,15 @@ def kmean_anchors(path='./data/coco128.yaml', n=9, img_size=640, thr=4.0, gen=10
                 k) - 1 else '\n')  # use in *.cfg
         return k
 
-    if isinstance(path, str):  # *.yaml file
-        with open(path, encoding="utf-8") as f:
-            data_dict = yaml.load(f, Loader=yaml.FullLoader)  # model dict
-        from .datasets import LoadImagesAndLabels
-        dataset = LoadImagesAndLabels(data_dict["train"],
-                                      augment=True,
-                                      rect=True)
-    else:
-        dataset = path  # dataset
+    # if isinstance(path, str):  # *.yaml file
+    #     with open(path, encoding="utf-8") as f:
+    #         data_dict = yaml.load(f, Loader=yaml.FullLoader)  # model dict
+    #     from .datasets import LoadImagesAndLabels
+    #     dataset = LoadImagesAndLabels(data_dict["train"],
+    #                                   augment=True,
+    #                                   rect=True)
+    # else:
+    dataset = path  # dataset
 
     # Get label wh
     shapes = img_size * dataset.shapes / dataset.shapes.max(1, keepdims=True)

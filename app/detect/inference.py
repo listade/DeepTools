@@ -14,6 +14,7 @@ from torchvision.ops import nms
 
 from .utils.torch_utils import select_device
 from .utils.general import non_max_suppression, plot_one_box
+from .models.yolo import Model
 
 warnings.filterwarnings("ignore", category=UserWarning)
 
@@ -45,9 +46,12 @@ def main(opt):
     dataset = ImagesDataset(opt.input)
 
     with torch.no_grad():
-        weights = torch.load(opt.weights, map_location=device)
-        model = weights["model"]
-        infer = model.float().fuse().eval()  # load FP32 model
+        model = Model(cfg=opt.cfg)
+        state = torch.load(opt.weights)
+        model.load_state_dict(state)
+
+        model.to(opt.device)
+        model = model.float().fuse().eval()  # load FP32 model
 
         for path, img_np in dataset:
             total = torch.zeros((0, 6), dtype=torch.float32).to(device)
@@ -64,7 +68,7 @@ def main(opt):
                 if im_tile.ndimension() == 3:
                     im_tile = im_tile.unsqueeze(0)
 
-                res = infer(im_tile, augment=opt.augment)
+                res = model(im_tile, augment=opt.augment)
                 pred = res[0]
                 nms_pred = non_max_suppression(pred,
                                                conf_thres=opt.conf_thres,
@@ -125,6 +129,11 @@ if __name__ == "__main__":
                         metavar="<path>")
 
     parser.add_argument("--weights",
+                        type=str,
+                        required=True,
+                        metavar="<path>")
+
+    parser.add_argument("--cfg",
                         type=str,
                         required=True,
                         metavar="<path>")

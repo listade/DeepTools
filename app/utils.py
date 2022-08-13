@@ -1,4 +1,4 @@
-"""Utils module"""
+"""This module contains computer vision utils"""
 
 import json
 import sys

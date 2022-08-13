@@ -1,3 +1,5 @@
+"""This module contains package installer"""
+
 from setuptools import setup, find_packages
 
 setup(

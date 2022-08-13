@@ -1,4 +1,4 @@
-"""Semantic segmentation module"""
+"""This module runs semantic segmentation inference"""
 
 import argparse
 import glob
@@ -77,7 +77,7 @@ def main(opt):
 
             for i, batch in tiler(img_res, batch_size=opt.batch_size):
                 batch = torch.from_numpy(batch).float().to(device)
-                logits = model(batch)
+                logits = model.forward(batch)
                 pr_masks = logits.sigmoid().squeeze().cpu().numpy()
 
                 mmerger.add_batch(i, opt.batch_size, pr_masks)

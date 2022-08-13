@@ -1,4 +1,4 @@
-"""Semantic segmentation module"""
+"""This module contains semantic segmentation model"""
 
 import pytorch_lightning as pl
 import segmentation_models_pytorch as smp
@@ -140,10 +140,10 @@ def get_training_augmentation():
         albu.VerticalFlip(p=0.5),
         albu.RandomRotate90(p=0.5),
         albu.Transpose(p=0.5),
-        albu.ShiftScaleRotate(scale_limit=0.05, rotate_limit=(
-            20, 70), border_mode=0, p=0.5),
+        albu.ShiftScaleRotate(scale_limit=0.05,
+                              rotate_limit=(20, 70),
+                              border_mode=0, p=0.5),
         albu.Perspective(p=0.5),
-
         albu.Compose(
             [
                 albu.CLAHE(clip_limit=2., p=0.4),
