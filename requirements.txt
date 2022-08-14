@@ -10,3 +10,4 @@ tiler
 pyproj
 pytorch_lightning
 albumentations
+opencv-contrib-python
