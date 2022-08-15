@@ -45,15 +45,12 @@ def on_set_mouse(event, x, y, *_):
     elif event == cv2.EVENT_LBUTTONUP:
         mouse_down = False
         txt = img.replace(path.suffix, ".txt")
-        write_bbox(np.array((x0, y0, x, y)), txt)
+        bbox = np.array((0, float(x0), float(y0), float(x), float(y)))  # [!]
+        line = "%d %.1f %.1f %.1f %.1f" % tuple(bbox)
 
+        with open(txt, "a", encoding="utf-8") as f:
+            print(line, file=f)
 
-def write_bbox(bbox, file):
-    """Save bbox to file"""
-
-    with open(file, "a", encoding="utf-8") as f:
-        f.write(" ".join(str(v) for v in bbox))
-        f.write("\n")
 
 
 if __name__ == "__main__":
@@ -62,6 +59,10 @@ if __name__ == "__main__":
     parser.add_argument("images",
                         type=str,
                         nargs="+")
+
+    parser.add_argument("--img-size",
+                        default=640,
+                        type=int)
 
     opt = parser.parse_args()
     imgs = []

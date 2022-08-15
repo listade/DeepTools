@@ -15,7 +15,7 @@ def crop(img_path, txt_path, img_size=640, draw_labels=False):
 
     img_np = cv2.imread(img_path)
     img_height, img_width, _ = img_np.shape
-    true_positive, false_positive, false_negative = 0, 1, 2
+    TP, FP, FN = 0, 1, 2
     input_xyxy = np.loadtxt(txt_path, ndmin=2)
 
     xywh = xyxy2xywh(input_xyxy[:, 1:])  # remove cls column
@@ -24,8 +24,8 @@ def crop(img_path, txt_path, img_size=640, draw_labels=False):
     xywh = np.hstack([input_xyxy[:, [0]], xywh])  # append cls column
 
     # assign all FN to TP
-    clsmask = xywh[:, 0] == false_negative
-    xywh[clsmask, 0] = true_positive
+    clsmask = xywh[:, 0] == FN
+    xywh[clsmask, 0] = TP
     tpfp = xywh[:, [0]].copy()
     xywh = xywh[:, 1::].copy()
 
@@ -71,7 +71,7 @@ def crop(img_path, txt_path, img_size=640, draw_labels=False):
 
                 # keep only TP coordinates
                 keep_xyxy = keep_xyxy[tpfp.flatten(
-                )[bboxkeep] != false_positive]
+                )[bboxkeep] != FP]
                 keep_xyxy[:, 0] -= x1
                 keep_xyxy[:, 2] -= x1
                 keep_xyxy[:, 1] -= y1
@@ -90,7 +90,7 @@ def crop(img_path, txt_path, img_size=640, draw_labels=False):
                     keep_mask = rem_mask.copy()
 
                     for cls, xmi, ymi, xma, yma in rem_xyxy.astype(int):
-                        if cls == true_positive:
+                        if cls == TP:
                             cv2.rectangle(rem_mask, (xmi, ymi),
                                           (xma, yma), 1, -1)
                     for xmi, ymi, xma, yma in keep_xyxy.astype(int):
