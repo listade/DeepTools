@@ -6,50 +6,119 @@ from pathlib import Path
 
 import cv2
 import numpy as np
-
-BASE_WIDTH, BASE_HEIGHT = 1024, 768
-
-draw = False
-img_np = None
-tmp = None
-x0, y0 = 0, 0
+from tiler import Tiler
 
 
-def on_set_mouse(event, x, y, *_):
-    """Mouse events handler"""
-    global draw, img_np, tmp, x0, y0
+class Annotator:
+    """Bounding box annotator"""
+    base_w, base_h = 1024, 768
 
-    cv2.setWindowTitle(WINDOW, f"{WINDOW} | X {x} Y {y}")
+    def __init__(self, img, winname="cv2"):
+        if isinstance(img, str):
+            self._img_np = cv2.imread(img)
+            if self._img_np is None:
+                raise ValueError()
 
-    if event == cv2.EVENT_LBUTTONDOWN:
-        draw = True
-        x0, y0 = x, y
-        tmp = img_np.copy()
+        elif isinstance(img, np.ndarray):
+            self._img_np = img
+        else:
+            raise TypeError()
 
-    elif event == cv2.EVENT_MOUSEMOVE:
-        if draw == True:
-            w = abs(x - x0)
-            h = abs(y - y0)
+        h, w, _ = self._img_np.shape
+        scale = (self.base_h / h)
 
-            title = f"{WINDOW} | X {x0} Y {y0}  W {w} H {h}"
-            cv2.setWindowTitle(WINDOW, title)
+        self._win = winname
+        self._draw = False
+        self._x0, self._y0 = 0, 0
+        self._tmp = None
+        self._bboxes = []
 
-            img_np = tmp.copy()
-            cv2.rectangle(img_np,
-                          (x0, y0),
-                          (x, y),
-                          color=(50, 200, 50),
-                          thickness=12)
+        def on_mouse_event(event, x, y, *_):
+            """Mouse events handler"""
 
-    elif event == cv2.EVENT_LBUTTONUP:
-        draw = False
-        txt = img.replace(path.suffix, ".txt")
-        bbox = np.array((0, float(x0), float(y0), float(x), float(y)))  # [!]
-        line = "%d %.1f %.1f %.1f %.1f" % tuple(bbox)
+            cv2.setWindowTitle(self._win, f"{self._win} | X {x} Y {y}")
+            if event == cv2.EVENT_LBUTTONDOWN:
+                self._draw = True
+                self._x0, self._y0 = x, y
+                self._tmp = self._img_np.copy()
 
-        with open(txt, "a", encoding="utf-8") as f:
-            print(line, file=f)
+            elif event == cv2.EVENT_MOUSEMOVE:
+                if self._draw is True:
+                    w = abs(x - self._x0)
+                    h = abs(y - self._y0)
 
+                    title = f"{self._win} | X {self._x0} Y {self._y0}  W {w} H {h}"
+                    cv2.setWindowTitle(self._win, title)
+
+                    self._img_np = self._tmp.copy()
+                    cv2.rectangle(self._img_np,
+                                  (self._x0, self._y0),
+                                  (x, y),
+                                  color=(50, 200, 50),
+                                  thickness=12)
+
+            elif event == cv2.EVENT_LBUTTONUP:
+                self._draw = False
+                self._bboxes.append((self._x0, self._y0, x, y))
+
+        cv2.namedWindow(self._win, cv2.WINDOW_NORMAL)
+        cv2.resizeWindow(self._win, int(w * scale), int(h * scale))
+        cv2.setMouseCallback(self._win, on_mouse_event)
+
+
+    def get_bboxes(self):
+        """Returns bboxes list"""
+        while cv2.getWindowProperty(self._win, cv2.WND_PROP_VISIBLE) > 0:
+            cv2.imshow(self._win, self._img_np)
+            cv2.waitKey(20)
+
+        return self._bboxes[:]
+
+
+    def save_bboxes(self, filename):
+        """Save bboxes to file"""
+        lines = ["%d %.1f %.1f %.1f %.1f\n" % tuple((0, *v)) for v in self._bboxes]
+
+        with open(filename, "a", encoding="utf-8") as f:
+            f.writelines(lines)
+
+
+def crop_image(img, size, overlap=100):
+    """Crop image and save tiles"""
+    img_np = cv2.imread(img)
+    tiler = Tiler(data_shape=img_np.shape,
+                tile_shape=(size, size, 3),
+                channel_dimension=2,
+                overlap=overlap)
+    path = Path(img)
+    for i, tile in tiler(img_np):
+        name = str(path).replace(path.stem, f"{path.stem}_{i}")
+        cv2.imwrite(name, tile)
+        yield name
+
+
+def main(args):
+    """Entry point"""
+    imgs = []
+
+    for v in args.images:
+        imgs += glob.glob(v, recursive=True)
+
+    if opt.crop:
+        cropd = []
+        for v in imgs[:]:
+            cropd += list(crop_image(v, args.crop))
+            imgs.remove(v)
+        imgs += cropd
+
+
+    for i, v in enumerate(imgs):
+        path = Path(v)
+        img = str(path)
+
+        antor = Annotator(img, winname=f"{path.name} ({i+1}/{len(imgs)})")
+        antor.get_bboxes()
+        antor.save_bboxes(img.replace(path.suffix, ".txt"))
 
 
 if __name__ == "__main__":
@@ -59,32 +128,8 @@ if __name__ == "__main__":
                         type=str,
                         nargs="+")
 
-    parser.add_argument("--img-size",
-                        default=640,
+    parser.add_argument("--crop",
                         type=int)
 
     opt = parser.parse_args()
-    imgs = []
-
-    for v in opt.images:
-        imgs += glob.glob(v, recursive=True)
-
-    for i, v in enumerate(imgs):
-        path = Path(v)
-        img = str(path)
-        img_np = cv2.imread(img)
-
-        if img_np is None:
-            continue
-
-        H, W, _ = img_np.shape
-        scale = (BASE_HEIGHT / H)
-        WINDOW = f"{path.name} ({i+1}/{len(imgs)})"
-
-        cv2.namedWindow(WINDOW, cv2.WINDOW_NORMAL)
-        cv2.resizeWindow(WINDOW, int(W * scale), int(H * scale))
-        cv2.setMouseCallback(WINDOW, on_set_mouse)
-
-        while cv2.getWindowProperty(WINDOW, cv2.WND_PROP_VISIBLE) > 0:
-            cv2.imshow(WINDOW, img_np)
-            cv2.waitKey(20)
+    main(opt)
