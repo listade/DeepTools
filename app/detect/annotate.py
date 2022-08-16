@@ -9,31 +9,30 @@ import numpy as np
 
 BASE_WIDTH, BASE_HEIGHT = 1024, 768
 
-mouse_down = False
+draw = False
 img_np = None
 tmp = None
-win_name = ""
 x0, y0 = 0, 0
 
 
 def on_set_mouse(event, x, y, *_):
     """Mouse events handler"""
-    global mouse_down, img_np, tmp, x0, y0
+    global draw, img_np, tmp, x0, y0
 
-    cv2.setWindowTitle(win_name, f"{win_name} x:{x} y:{y}")
+    cv2.setWindowTitle(WINDOW, f"{WINDOW} | X {x} Y {y}")
 
     if event == cv2.EVENT_LBUTTONDOWN:
-        mouse_down = True
+        draw = True
         x0, y0 = x, y
         tmp = img_np.copy()
 
     elif event == cv2.EVENT_MOUSEMOVE:
-        if mouse_down == True:
+        if draw == True:
             w = abs(x - x0)
             h = abs(y - y0)
 
-            title = f"{win_name} x: {x0} y: {y0} w: {w} h: {h}"
-            cv2.setWindowTitle(win_name, title)
+            title = f"{WINDOW} | X {x0} Y {y0}  W {w} H {h}"
+            cv2.setWindowTitle(WINDOW, title)
 
             img_np = tmp.copy()
             cv2.rectangle(img_np,
@@ -43,7 +42,7 @@ def on_set_mouse(event, x, y, *_):
                           thickness=12)
 
     elif event == cv2.EVENT_LBUTTONUP:
-        mouse_down = False
+        draw = False
         txt = img.replace(path.suffix, ".txt")
         bbox = np.array((0, float(x0), float(y0), float(x), float(y)))  # [!]
         line = "%d %.1f %.1f %.1f %.1f" % tuple(bbox)
@@ -70,7 +69,7 @@ if __name__ == "__main__":
     for v in opt.images:
         imgs += glob.glob(v, recursive=True)
 
-    for v in imgs:
+    for i, v in enumerate(imgs):
         path = Path(v)
         img = str(path)
         img_np = cv2.imread(img)
@@ -78,16 +77,14 @@ if __name__ == "__main__":
         if img_np is None:
             continue
 
-        h, w, _ = img_np.shape
-        win_name = f"{path.name} {w}x{h}"
+        H, W, _ = img_np.shape
+        scale = (BASE_HEIGHT / H)
+        WINDOW = f"{path.name} ({i+1}/{len(imgs)})"
 
-        cv2.namedWindow(win_name, cv2.WINDOW_NORMAL)
+        cv2.namedWindow(WINDOW, cv2.WINDOW_NORMAL)
+        cv2.resizeWindow(WINDOW, int(W * scale), int(H * scale))
+        cv2.setMouseCallback(WINDOW, on_set_mouse)
 
-        scale = (BASE_HEIGHT / h)
-
-        cv2.resizeWindow(win_name, int(w * scale), int(h * scale))
-        cv2.setMouseCallback(win_name, on_set_mouse)
-
-        while cv2.getWindowProperty(win_name, cv2.WND_PROP_VISIBLE) > 0:
-            cv2.imshow(win_name, img_np)
+        while cv2.getWindowProperty(WINDOW, cv2.WND_PROP_VISIBLE) > 0:
+            cv2.imshow(WINDOW, img_np)
             cv2.waitKey(20)
