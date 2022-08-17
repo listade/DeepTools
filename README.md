@@ -19,7 +19,11 @@ https://developer.download.nvidia.com/compute/redist/cudnn/v8.4.0/local_installe
   $ python -c "import torch;print(torch.cuda.is_available())"
 ```
 # Usage
-   Object detection
+  Dataset creating
+  ```
+    $ python -m detect.annotate <path-to-images>/*.jpg
+  ```
+  Object detection
   ```
     $ python -m detect.inference --input ./images --weights ./best.pt --cfg cfg/yolov4-p5.yaml --save-img 
   ```
