@@ -14,7 +14,7 @@ from PIL import ExifTags, Image
 from torch.utils.data import Dataset
 from tqdm import tqdm
 
-from .general import torch_distributed_zero_first, xywh2xyxy, xyxy2xywh
+from .general import xywh2xyxy, xyxy2xywh
 
 
 class LoadImagesAndLabels(Dataset):
@@ -599,29 +599,30 @@ def exif_size(img):
     return wh
 
 
-def create_dataloader(path, imgsz, batch_size, stride, opt, hyp=None, augment=False, cache=False, pad=0.0, rect=False,
-                      local_rank=-1, world_size=1):
-    # Make sure only the first process in DDP process the dataset first, and the following others can use the cache.
-    with torch_distributed_zero_first(local_rank):
-        dataset = LoadImagesAndLabels(path, imgsz, batch_size,
-                                      augment=augment,  # augment images
-                                      hyp=hyp,  # augmentation hyperparameters
-                                      rect=rect,  # rectangular training
-                                      cache_images=cache,
-                                      single_cls=opt.single_cls,
-                                      stride=int(stride),
-                                      pad=pad)
+def create_dataloader(path,
+                      imgsz,
+                      batch_size,
+                      stride,
+                      hyp=None,
+                      augment=False,
+                      cache=False,
+                      pad=.0,
+                      rect=False):
+    """Init dataset and dataloader"""
 
-    batch_size = min(batch_size, len(dataset))
-    # number of workers
-    nw = min([os.cpu_count() // world_size,
-             batch_size if batch_size > 1 else 0, 8])
-    train_sampler = torch.utils.data.distributed.DistributedSampler(
-        dataset) if local_rank != -1 else None
+    dataset = LoadImagesAndLabels(path,
+                                  imgsz,
+                                  batch_size,
+                                  augment=augment,
+                                  hyp=hyp,
+                                  rect=rect,
+                                  cache_images=cache,
+                                  stride=int(stride),
+                                  pad=pad)
+
     dataloader = torch.utils.data.DataLoader(dataset,
                                              batch_size=batch_size,
-                                             num_workers=nw,
-                                             sampler=train_sampler,
+                                             num_workers=os.cpu_count(),
                                              pin_memory=True,
                                              collate_fn=LoadImagesAndLabels.collate_fn)
     return dataloader, dataset

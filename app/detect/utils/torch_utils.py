@@ -7,16 +7,6 @@ from copy import deepcopy
 import torch
 import torch.nn.functional as F
 from torch import nn
-from torch.backends import cudnn
-
-
-def init_seeds(seed=0):
-    """Speed-reproducibility tradeoff https://pytorch.org/docs/stable/notes/randomness.html"""
-
-    torch.manual_seed(seed)
-
-    cudnn.deterministic = seed == 0
-    cudnn.benchmark = seed != 0
 
 
 def select_device(device, batch_size=1):

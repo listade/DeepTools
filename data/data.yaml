@@ -1,9 +1,9 @@
 # train and val datasets (image directory or *.txt file with image paths)
-train: ./saved_model/train/images
-val: ./saved_model/val/images
+train: ./weights/detect/train/images
+val: ./weights/detect/valid/images
 
 # number of classes
-nc: 3
+nc: 1
 
 # class names
-names: ["car", "stump", "fire"]
+names: ["lair"]

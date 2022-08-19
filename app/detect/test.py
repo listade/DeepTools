@@ -15,7 +15,7 @@ from tqdm import tqdm
 from .models.experimental import attempt_load
 from .utils.datasets import create_dataloader
 from .utils.general import (ap_per_class, box_iou, check_img_size, clip_coords,
-                            compute_loss, find_file, non_max_suppression,
+                            compute_loss, non_max_suppression,
                             output_to_target, plot_images, scale_coords,
                             xywh2xyxy, xyxy2xywh)
 from .utils.torch_utils import select_device, time_synchronized
@@ -94,9 +94,6 @@ def test(data,
                                           imgsz,
                                           batch_size,
                                           model.stride.max(),
-                                          opt,
-                                          hyp=None,
-                                          augment=False,
                                           cache=False,
                                           pad=0.5,
                                           rect=True)
@@ -297,12 +294,12 @@ def test(data,
 
     # Return results
     model.float()  # for training
-    maps = np.zeros(class_num) + map
+    maps = np.zeros(class_num) + _map
 
     for i, cls in enumerate(ap_class):
         maps[cls] = ap[i]
 
-    return (mp, mr, map50, map, *(loss.cpu() / len(dataloader)).tolist()), maps, t
+    return (mp, mr, map50, _map, *(loss.cpu() / len(dataloader)).tolist()), maps, t
 
 
 def study(weights, data, batch_size, conf_thres, iou_thres):
@@ -392,7 +389,6 @@ if __name__ == '__main__':
                         help="save results to *.txt")
 
     opt = parser.parse_args()
-    opt.data = find_file(opt.data)  # check file
 
     if opt.task in ("val", "test"):  # run normally
         test(opt.data,

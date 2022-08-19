@@ -46,7 +46,7 @@ https://developer.download.nvidia.com/compute/redist/cudnn/v8.4.0/local_installe
 
 $ pylint --generated-members=cv2.*,torch.* app
 ------------------------------------------------------------------
-Your code has been rated at 7.06/10 (previous run: 7.13/10, -0.07)
+Your code has been rated at 7.29/10 (previous run: 7.04/10, +0.25)
 ```
 
 
