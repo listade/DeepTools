@@ -27,6 +27,7 @@ from .utils.general import (check_img_size, compute_loss, fitness,
                             plot_images, plot_labels, plot_results,
                             save_mutation, strip_optimizer)
 from .utils.torch_utils import ModelEMA, select_device
+from .const import hyp_meta
 
 
 def train(data: str,
@@ -39,6 +40,7 @@ def train(data: str,
           weights: str,
           tb_writer=None,
           log_dir="."):
+
     """Training weights"""
 
     log_dir = Path(tb_writer.log_dir) if tb_writer is not None else Path(log_dir) / "evolve"  # logging directory path
@@ -49,72 +51,60 @@ def train(data: str,
 
     os.makedirs(weights_dir, exist_ok=True)  # create weights directory
 
-    with open(data, encoding="utf-8") as f:
-        data_dict = yaml.load(f, Loader=yaml.FullLoader)  # load data dict
+    with open(data, encoding="utf-8") as f: # load data dict
+        data_dict = yaml.load(f, Loader=yaml.FullLoader)
 
-    with open(hyp, encoding="utf-8") as f:
-        hyp_dict = yaml.load(f, Loader=yaml.FullLoader)  # load hyp dict
+    with open(hyp, encoding="utf-8") as f: # load hyp dict
+        hyp_dict = yaml.load(f, Loader=yaml.FullLoader)
 
-    with open(log_dir / "hyp.yaml", "w", encoding="utf-8") as f:
-        yaml.dump(hyp_dict, f, sort_keys=False)  # save hyp dict
+    with open(log_dir / "hyp.yaml", "w", encoding="utf-8") as f: # save hyp dict
+        yaml.dump(hyp_dict, f, sort_keys=False)
 
-    is_cuda = device.type != "cpu"  # is cuda device
+    torch.manual_seed(2) # speed-reproducibility tradeoff https://pytorch.org/docs/stable/notes/randomness.html
+    cudnn.deterministic = False
+    cudnn.benchmark = True
 
-    torch.manual_seed(2) # [!]
+    assert len(data_dict["names"]) == int(data_dict["nc"]) # check names count
 
-    cudnn.deterministic = False # speed-reproducibility tradeoff https://pytorch.org/docs/stable/notes/randomness.html
-    cudnn.benchmark = True # [!]
+    model = Model(cfg, ch=3, nc=int(data_dict["nc"])) # define model
+    model = model.to(device) # load model to gpu
 
-    train_path = data_dict["train"]  # path to train dataset
-    test_path = data_dict["val"]  # path to valid dataset
-
-    classes_num = int(data_dict["nc"]) # classes num
-    classes_names = data_dict["names"] # classes names
-
-    assert len(classes_names) == classes_num # check names count
-
-    model = Model(cfg, ch=3, nc=classes_num) # define model
-    model = model.to(device) # load model to device
-
-    weights_path = Path(weights)
-
-    if weights_path.exists():
+    if Path(weights).exists(): # if weights already exists
         state_dict = torch.load(weights, map_location=device)  # load weights
         model.load_state_dict(state_dict)  # load weights state
 
     nominal_batch_size = 64  # nominal batch size
     accumulate = max(round(nominal_batch_size / batch_size), 1) # accumulate loss before optimizing
-
     hyp_dict["weight_decay"] *= batch_size * accumulate / nominal_batch_size  # scale weight_decay
 
-    pg0 = [] # other
-    pg1 = [] # weight decay
-    pg2 = [] # biases
+    params_group_0 = [] # other
+    params_group_1 = [] # weight decay
+    params_group_2 = [] # biases
 
     for k, v in model.named_parameters():
         v.requires_grad = True
         if ".bias" in k:
-            pg2.append(v)  # biases
+            params_group_2.append(v)  # biases
         elif ".weight" in k and ".bn" not in k:
-            pg1.append(v)  # apply weight decay
+            params_group_1.append(v)  # apply weight decay
         else:
-            pg0.append(v)  # all else
+            params_group_0.append(v)  # all else
 
-    optimizer = optim.SGD(pg0, # other params
-                          lr=hyp_dict["lr0"], # learning rate
+    optimizer = optim.SGD(params_group_0, # other params
+                          lr=hyp_dict["lr0"],
                           momentum=hyp_dict["momentum"],
                           nesterov=True)
 
     optimizer.add_param_group({
-        "params": pg1,
+        "params": params_group_1,
         "weight_decay": hyp_dict["weight_decay"]
     }) # add pg1 with weight_decay
 
     optimizer.add_param_group({
-        "params": pg2
+        "params": params_group_2
     }) # add pg2 (biases)
 
-    print(f"Optimizer groups: {len(pg2)} .bias, {len(pg1)} conv.weight, {len(pg0)} other")
+    print(f"Optimizer groups: {len(params_group_2)} .bias, {len(params_group_1)} conv.weight, {len(params_group_0)} other")
 
     def lf(x): return (((1 + math.cos(x * math.pi / epochs)) / 2) ** 1.0) * 0.8 + 0.2  # cosine
 
@@ -127,8 +117,7 @@ def train(data: str,
     imgsz, imgsz_test = [check_img_size(x, max_stride) for x in img_size] # verify imgsz are gs-multiples
 
     ema = ModelEMA(model) # exponential moving average
-
-    train_loader, train_dataset = create_dataloader(path=train_path,
+    train_loader, train_dataset = create_dataloader(path=data_dict["train"],
                                                     imgsz=imgsz,
                                                     batch_size=batch_size,
                                                     stride=max_stride,
@@ -138,27 +127,27 @@ def train(data: str,
                                                     rect=False) # train loader
 
     max_label_class = np.concatenate(train_dataset.labels, 0)[:, 0].max()  # max label class
-    batches_num = len(train_loader)  # number of batches
+    batches_num = len(train_loader)  # num of batches
 
-    assert max_label_class < classes_num, f"Label class {max_label_class} exceeds nc={classes_num}. Possible class labels are 0-{classes_num - 1}"
+    assert max_label_class < int(data_dict["nc"])  # check labels num
 
-    ema.updates = start_epoch * batches_num // accumulate  # set EMA updates ***
-    test_loader, _ = create_dataloader(path=test_path,
+    ema.updates = start_epoch * batches_num // accumulate  # set EMA updates
+    test_loader, _ = create_dataloader(path=data_dict["val"],
                                        imgsz=imgsz_test,
                                        batch_size=batch_size,
                                        stride=max_stride,
                                        hyp=hyp_dict,
                                        augment=False,
                                        cache=True,
-                                       rect=True) # local_rank is set to -1. Because only the first process is expected to do evaluation.
+                                       rect=True)
 
-    hyp_dict["cls"] *= classes_num / 80.  # scale coco-tuned hyp["cls"] to current dataset
+    hyp_dict["cls"] *= int(data_dict["nc"]) / 80.  # scale coco-tuned hyp["cls"] to current dataset
 
-    model.nc = classes_num  # attach number of classes to model
+    model.nc = int(data_dict["nc"])  # attach number of classes to model
     model.hyp = hyp_dict  # attach hyperparameters to model
     model.gr = 1.0  # attach giou loss ratio (obj_loss = 1.0 or giou)
-    model.class_weights = labels_to_class_weights(train_dataset.labels, classes_num).to(device)  # attach class weights
-    model.names = classes_names # attach names to model
+    model.class_weights = labels_to_class_weights(train_dataset.labels, int(data_dict["nc"])).to(device)  # attach class weights
+    model.names = data_dict["names"] # attach names to model
 
     labels = np.concatenate(train_dataset.labels, 0)  # [?]
     c = torch.tensor(labels[:, 0])  # classes
@@ -170,11 +159,12 @@ def train(data: str,
 
     t0 = time.time() # start training
     nw = max(3 * batches_num, 1e3) # number of warmup iterations, max(3 epochs, 1k iterations)
-    maps = np.zeros(classes_num)  # mAP per class
+    maps = np.zeros(int(data_dict["nc"]))  # mAP per class
 
     results = (0, 0, 0, 0, 0, 0, 0) # "P", "R", "mAP", "F1", "val GIoU", "val Objectness", "val Classification"
 
     scheduler.last_epoch = start_epoch - 1  # do not move
+    is_cuda = device.type != "cpu"  # is cuda device
     scaler = amp.GradScaler(enabled=is_cuda)
 
     print(f"Image sizes {imgsz} train, {imgsz_test} test")
@@ -187,7 +177,7 @@ def train(data: str,
         if train_dataset.image_weights: # update image weights (optional)
             w = model.class_weights.cpu().numpy() * (1 - maps) ** 2
             image_weights = labels_to_image_weights(train_dataset.labels,
-                                                    nc=classes_num,
+                                                    nc=int(data_dict["nc"]),
                                                     class_weights=w)
 
             train_dataset.indices = random.choices(range(train_dataset.img_num), # generate indices
@@ -327,31 +317,6 @@ def evolve(data: str,
            img_size: int):
     """Hyperparaemeters evolution"""
 
-    meta = { # hyperparameter evolution metadata (mutation scale 0-1, lower_limit, upper_limit)
-        "lr0": (1, 1e-5, 1e-1),  # initial learning rate (SGD=1E-2)
-        "momentum": (0.1, 0.6, 0.98),  # SGD momentum
-        "weight_decay": (1, 0.0, 0.001),  # optimizer weight decay
-        "giou": (1, 0.02, 0.2),  # GIoU loss gain
-        "cls": (1, 0.2, 4.0),  # cls loss gain
-        "cls_pw": (1, 0.5, 2.0),  # cls BCELoss positive_weight
-        "obj": (1, 0.2, 4.0),  # obj loss gain (scale with pixels)
-        "obj_pw": (1, 0.5, 2.0),  # obj BCELoss positive_weight
-        "iou_t": (0, 0.1, 0.7),  # IoU training threshold
-        "anchor_t": (1, 2.0, 8.0),  # anchor-multiple threshold
-        "fl_gamma": (0, 0.0, 2.0), # focal loss gamma (efficientDet default gamma=1.5)
-        "hsv_h": (1, 0.0, 0.1), # image HSV-Hue augmentation (fraction)
-        "hsv_s": (1, 0.0, 0.9), # image HSV-Saturation augmentation (fraction)
-        "hsv_v": (1, 0.0, 0.9), # image HSV-Value augmentation (fraction)
-        "degrees": (1, 0.0, 45.0),  # image rotation (+/- deg)
-        "translate": (1, 0.0, 0.9),  # image translation (+/- fraction)
-        "scale": (1, 0.0, 0.9),  # image scale (+/- gain)
-        "shear": (1, 0.0, 10.0),  # image shear (+/- deg)
-        "perspective": (1, 0.0, 0.001), # image perspective (+/- fraction), range 0-0.001
-        "flipud": (0, 0.0, 1.0),  # image flip up-down (probability)
-        "fliplr": (1, 0.0, 1.0),  # image flip left-right (probability)
-        "mixup": (1, 0.0, 1.0), # image mixup (probability)
-    }
-
     with open(hyp, encoding="utf-8") as f:
         hyp_dict = yaml.load(f, Loader=yaml.FullLoader)  # load hyp dict
 
@@ -370,8 +335,8 @@ def evolve(data: str,
 
             np.random.seed(int(time.time()))
 
-            g = np.array([x[0] for x in meta.values()])  # gains 0-1
-            ng = len(meta)
+            g = np.array([x[0] for x in hyp_meta.values()])  # gains 0-1
+            ng = len(hyp_meta)
             v = np.ones(ng)
 
             while all(v == 1):  # mutate until a change occurs (prevent duplicates)
@@ -380,7 +345,7 @@ def evolve(data: str,
             for i, k in enumerate(hyp_dict.keys()):  # plt.hist(v.ravel(), 300)
                 hyp_dict[k] = float(mutations[i + 7] * v[i])  # mutate
 
-        for k, v in meta.items(): # constrain to limits
+        for k, v in hyp_meta.items(): # constrain to limits
             hyp_dict[k] = max(hyp_dict[k], v[1])  # lower limit
             hyp_dict[k] = min(hyp_dict[k], v[2])  # upper limit
             hyp_dict[k] = round(hyp_dict[k], 5)  # significant digits
