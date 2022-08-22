@@ -21,12 +21,12 @@ from .utils.general import (ap_per_class, box_iou, check_img_size, clip_coords,
 from .utils.torch_utils import select_device, time_synchronized
 
 
-def test(data,
-         weights=None,
+def test(data: str,
+         weights: str,
          batch_size=16,
          imgsz=640,
          conf_thres=0.001,
-         iou_thres=0.6,  # for NMS
+         iou_thres=0.6,
          single_cls=False,
          augment=False,
          verbose=False,
@@ -35,41 +35,34 @@ def test(data,
          save_dir='',
          merge=False,
          save_txt=False):
+
     """Test weights"""
 
-    # Initialize/load model and set device
     training = model is not None
     if training:  # called by train.py
         device = next(model.parameters()).device  # get model device
 
     else:  # called directly
-        device = select_device(opt.device, batch_size=batch_size)
-        merge = opt.merge
-        save_txt = opt.save_txt  # use Merge NMS, save *.txt labels
-
+        device = select_device(device, batch_size=batch_size)
         if save_txt:
             out = Path("inference/output")
             if os.path.exists(out):
                 shutil.rmtree(out)  # delete output folder
             os.makedirs(out)  # make new output folder
 
-        # Remove previous
-        mask = str(Path(save_dir) / "test_batch*.jpg")
+        mask = str(Path(save_dir) / "test_batch*.jpg") # remove previous
         for v in glob.glob(mask):
             os.remove(v)
 
-        # Load model
         model = attempt_load(weights, map_location=device)  # load FP32 model
         max_stride = model.stride.max()
         imgsz = check_img_size(imgsz, stride=max_stride)  # check img_size
 
-    # Half
     half = device.type != "cpu"  # half precision only supported on CUDA
     if half:
         model.half()
 
-    # Configure
-    model.eval()
+    model.eval() # configure
 
     with open(data, encoding="utf-8") as f:
         data = yaml.load(f, Loader=yaml.FullLoader)  # model dict
@@ -80,15 +73,11 @@ def test(data,
     iouv = iouv.to(device)
     niou = iouv.numel()  # num of elements in tensor
 
-    # Dataloader
     if not training:
         img = torch.zeros((1, 3, imgsz, imgsz), device=device)  # init img
+        _ = model(img.half() if half else img) if device.type != "cpu" else None # run once
 
-        # run once
-        _ = model(img.half() if half else img) if device.type != "cpu" else None
-
-        # path to val/test images
-        path = data['test'] if opt.task == 'test' else data['val']
+        path = data['val'] # path to valid images
 
         dataloader, _ = create_dataloader(path,
                                           imgsz,
@@ -96,19 +85,11 @@ def test(data,
                                           model.stride.max(),
                                           cache=False,
                                           pad=0.5,
-                                          rect=True)
-
+                                          rect=True) # dataloader
     seen = 0
     names = model.names if hasattr(model, "names") else model.module.names
 
-    s = ("%20s" + "%12s" * 6) % ("Class", 
-                                 "Images",
-                                 "Targets", 
-                                 "P", 
-                                 "R", 
-                                 "mAP@.5", 
-                                 "mAP@.5:.95")
-
+    s = ("%20s" + "%12s" * 6) % ("Class", "Images", "Targets", "P", "R", "mAP@.5", "mAP@.5:.95")
     p, r, mp, mr, map50, _map, t0, t1 = .0, .0, .0, .0, .0, .0, .0, .0
     stats, ap, ap_class = [], [], []
 
@@ -117,40 +98,29 @@ def test(data,
     for batch_i, (img, targets, paths, shapes) in enumerate(tqdm(dataloader, desc=s)):
         img = img.to(device, non_blocking=True)
         img = img.half() if half else img.float()  # uint8 to fp16/32
-
-        # 0 - 255 to 0.0 - 1.0
         img /= 255.0
-        targets = targets.to(device)
 
-        # batch size, channels, height, width
-        _, _, height, width = img.shape
+        targets = targets.to(device)
+        _, _, height, width = img.shape # batch size, channels, height, width
+
         whwh = torch.Tensor([width, height, width, height]).to(device)
 
-        # Disable gradients
-        with torch.no_grad():
-            # Run model
+        with torch.no_grad(): # disable gradients
             t = time_synchronized()
-
-            # inference and training outputs
-            inf_out, train_out = model(img, augment=augment)
+            inf_out, train_out = model(img, augment=augment) # inference and training outputs
             t0 += time_synchronized() - t
 
-            # Compute loss
             if training:  # if model has loss hyperparameters
-                # GIoU, obj, cls
-                loss += compute_loss([x.float()
-                                     for x in train_out], targets, model)[1][:3]
+                loss += compute_loss([x.float()for x in train_out], targets, model)[1][:3] # GIoU, obj, cls
 
-            # Run NMS
             t = time_synchronized()
             output = non_max_suppression(inf_out,
                                          conf_thres=conf_thres,
                                          iou_thres=iou_thres,
-                                         merge=merge)
+                                         merge=merge) # run NMS
             t1 += time_synchronized() - t
 
-        # Statistics per image
-        for si, pred in enumerate(output):
+        for si, pred in enumerate(output): # statistics per image
             labels = targets[targets[:, 0] == si, 1:]
             labels_len = len(labels)
             tcls = labels[:, 0].tolist() if labels_len else []  # target class
@@ -162,14 +132,11 @@ def test(data,
                             torch.Tensor(),
                             torch.Tensor(),
                             tcls)
-
                     stats.append(stat)
                 continue
 
-            # Append to text file
-            if save_txt:
-                # normalization gain whwh
-                gn = torch.tensor(shapes[si][0])[[1, 0, 1, 0]]
+            if save_txt: # append to text file
+                gn = torch.tensor(shapes[si][0])[[1, 0, 1, 0]] # normalization gain whwh
                 txt_path = str(out / Path(paths[si]).stem)
 
                 pred[:, :4] = scale_coords(img[si].shape[1:],
@@ -178,32 +145,25 @@ def test(data,
                                            shapes[si][1])  # to original
 
                 for *xyxy, _, cls in pred:
-                    xywh = (xyxy2xywh(torch.tensor(xyxy).view(1, 4)) / gn) \
-                        .view(-1) \
-                        .tolist()  # normalized xywh
+                    xywh = (xyxy2xywh(torch.tensor(xyxy).view(1, 4)) / gn).view(-1).tolist()  # normalized xywh
 
                     with open(txt_path + ".txt", "a", encoding="utf-8") as f:
                         line = ("%g " * 5 + "\n") % (cls, *xywh)  # label format
                         f.write(line)
 
-            # Clip boxes to image bounds
-            clip_coords(pred, (height, width))
+            clip_coords(pred, (height, width)) # clip boxes to image bounds
 
-            # Assign all predictions as incorrect
             correct = torch.zeros(pred.shape[0],
                                   niou,
                                   dtype=torch.bool,
-                                  device=device)
+                                  device=device) # assign all predictions as incorrect
 
             if labels_len:
                 detected = []  # target indices
                 tcls_tensor = labels[:, 0]
+                tbox = xywh2xyxy(labels[:, 1:5]) * whwh # target boxes
 
-                # target boxes
-                tbox = xywh2xyxy(labels[:, 1:5]) * whwh
-
-                # Per target class
-                for cls in torch.unique(tcls_tensor):
+                for cls in torch.unique(tcls_tensor): # per target class
                     ti = (cls == tcls_tensor) \
                         .nonzero(as_tuple=False) \
                         .view(-1)  # prediction indices
@@ -212,14 +172,9 @@ def test(data,
                         .nonzero(as_tuple=False) \
                         .view(-1)  # target indices
 
-                    # Search for detections
-                    if pi.shape[0]:
-                        # Prediction to target ious
-                        ious, i = box_iou(pred[pi, :4], tbox[ti]).max(
-                            1)  # best ious, indices
-
-                        # Append detections
-                        detected_set = set()
+                    if pi.shape[0]: # search for detections
+                        ious, i = box_iou(pred[pi, :4], tbox[ti]).max(1)  # prediction to target ious; best ious, indices
+                        detected_set = set() # append detections
 
                         for j in (ious > iouv[0]).nonzero(as_tuple=False):
                             d = ti[i[j]]  # detected target
@@ -228,20 +183,15 @@ def test(data,
                                 detected_set.add(d.item())
                                 detected.append(d)
 
-                                # iou_thres is 1xn
-                                correct[pi[j]] = ious[j] > iouv
-
-                                # all targets already located in image
-                                if len(detected) == labels_len:
+                                correct[pi[j]] = ious[j] > iouv # iou_thres is 1xn
+                                if len(detected) == labels_len: # all targets already located in image
                                     break
 
-            # Append statistics (correct, conf, pcls, tcls)
             stat = (correct.cpu(), pred[:, 4].cpu(), pred[:, 5].cpu(), tcls)
-            stats.append(stat)
+            stats.append(stat) # append statistics (correct, conf, pcls, tcls)
 
-        # Plot images
         if batch_i < 1:
-            f = Path(save_dir) / (f"test_batch_{batch_i}_gt.jpg")  # filename
+            f = Path(save_dir) / (f"test_batch_{batch_i}_gt.jpg")  # plot images
             plot_images(img,
                         targets,
                         paths,
@@ -255,8 +205,7 @@ def test(data,
                         str(f),
                         names)  # predictions
 
-    # Compute statistics
-    stats = [np.concatenate(x, 0) for x in zip(*stats)]  # to numpy
+    stats = [np.concatenate(x, 0) for x in zip(*stats)]  # compute statistics
 
     if len(stats) and stats[0].any():
         p, r, ap, _, ap_class = ap_per_class(*stats)
@@ -270,141 +219,123 @@ def test(data,
         map50 = ap50.mean()
         _map = ap.mean()
 
-        # number of targets per class
-        targets_num = np.bincount(
-            stats[3].astype(np.int64), minlength=class_num)
+        targets_num = np.bincount(stats[3].astype(np.int64),
+                                  minlength=class_num) # number of targets per class
     else:
         targets_num = torch.zeros(1)
 
-    # Print results
-    print(f"all {seen} {targets_num.sum()} {mp} {mr} {map50} {_map}")
+    print(f"all {seen} {targets_num.sum()} {mp} {mr} {map50} {_map}") # print results
 
-    # Print results per class
     if verbose and class_num > 1 and len(stats):
         for i, cls in enumerate(ap_class):
-            print(
-                f"{names[cls]} {seen} {targets_num[cls]} {p[i]} {r[i]} {ap50[i]} {ap[i]}")
+            print(f"{names[cls]} {seen} {targets_num[cls]} {p[i]} {r[i]} {ap50[i]} {ap[i]}") # print results per class
 
-    # Print speeds
-    t = tuple(x / seen * 1E3 for x in (t0, t1, t0 + t1)) + \
-        (imgsz, imgsz, batch_size)  # tuple
+    t = tuple(x / seen * 1E3 for x in (t0, t1, t0 + t1)) + (imgsz, imgsz, batch_size)  # print speeds
 
     if not training:
         print("Speed: %.1f/%.1f/%.1f ms inference/NMS/total per %gx%g image at batch-size %g" % t)
 
-    # Return results
     model.float()  # for training
     maps = np.zeros(class_num) + _map
 
     for i, cls in enumerate(ap_class):
         maps[cls] = ap[i]
 
-    return (mp, mr, map50, _map, *(loss.cpu() / len(dataloader)).tolist()), maps, t
+    return (mp, mr, map50, _map, *(loss.cpu() / len(dataloader)).tolist()), maps, t # return results
 
 
-def study(weights, data, batch_size, conf_thres, iou_thres):
-    """Study"""
-    for w in weights:  # [!]
-        # filename to save to
-        filename = f"study_{Path(opt.data).stem}_{Path(w).stem}.txt"
+def study(weights: str,
+          data: str,
+          batch_size: int,
+          conf_thres: float,
+          iou_thres: float):
+    """Running test over parameters"""
 
-        x = list(range(352, 832, 64))  # x axis
-        y = []  # y axis
+    filename = f"study_{Path(data).stem}_{Path(weights).stem}.txt" # filename to save to
 
-        for v in x:  # img-size
-            print(f"Running {filename} point {v}...")
+    x = list(range(352, 832, 64))  # x axis
+    y = []  # y axis
 
-            r, _, t = test(data,
-                           w,
-                           batch_size,
-                           v,
-                           conf_thres,
-                           iou_thres)
-            y.append(r + t)  # results and times
-        np.savetxt(filename, y, fmt="%10.4g")  # save
+    for v in x:  # img-size
+        print(f"Running {filename} point {v}...")
+        r, _, t = test(data, weights, batch_size, v, conf_thres, iou_thres)
+        y.append(r + t)  # results and times
+
+    np.savetxt(filename, y, fmt="%10.4g")  # save
 
 
-if __name__ == '__main__':
+def main():
+    """Entry point"""
+
     parser = argparse.ArgumentParser()
 
     parser.add_argument("--weights",
                         type=str,
-                        nargs="+",
-                        required=True,
-                        help="model.pt path(s)")
+                        required=True)
 
     parser.add_argument("--data",
                         type=str,
-                        required=True,
-                        help="data.yml path")
+                        required=True)
 
     parser.add_argument("--batch-size",
                         type=int,
-                        default=4,
-                        help="size of each image batch")
+                        default=4)
 
     parser.add_argument("--img-size",
                         type=int,
-                        default=640,
-                        help="inference size (px)")
+                        default=640)
 
     parser.add_argument("--conf-thres",
                         type=float,
-                        default=0.001,
-                        help="object confidence threshold")
+                        default=0.001)
 
     parser.add_argument("--iou-thres",
                         type=float,
-                        default=0.65,
-                        help="IOU threshold for NMS")
+                        default=0.65)
 
-    parser.add_argument("--task",
-                        type=str,
-                        default="val",
-                        help="'val', 'test', 'study'")
+    parser.add_argument("--study",
+                        type=bool,
+                        action="store_true")
 
     parser.add_argument("--device",
                         type=str,
-                        default="cuda",
-                        help="cuda device, i.e. 0 or 0,1,2,3 or cpu")
+                        default="cuda")
 
     parser.add_argument("--single-cls",
-                        action="store_true",
-                        help="treat as single-class dataset")
+                        action="store_true")
 
     parser.add_argument("--augment",
-                        action="store_true",
-                        help="augmented inference")
+                        action="store_true")
 
     parser.add_argument("--merge",
-                        action="store_true",
-                        help="use Merge NMS")
+                        action="store_true",)
 
     parser.add_argument("--verbose",
-                        action="store_true",
-                        help="report mAP by class")
+                        action="store_true")
 
     parser.add_argument("--save-txt",
-                        action="store_true",
-                        help="save results to *.txt")
+                        action="store_true")
 
     opt = parser.parse_args()
 
-    if opt.task in ("val", "test"):  # run normally
-        test(opt.data,
-             opt.weights,
-             opt.batch_size,
-             opt.img_size,
-             opt.conf_thres,
-             opt.iou_thres,
-             opt.single_cls,
-             opt.augment,
-             opt.verbose)
-        sys.exit()
-
-    if opt.task == "study":  # run over a range of settings and save/plot
+    if opt.study:  # run over a range of settings and save/plot
         study(opt.weights,
               opt.data,
               opt.batch_size,
               opt.conf_thres,
               opt.iou_thres)
+        sys.exit()
+
+    test(opt.data,
+         opt.weights,
+         opt.batch_size,
+         opt.img_size,
+         opt.conf_thres,
+         opt.iou_thres,
+         opt.single_cls,
+         opt.augment,
+         opt.verbose)
+
+
+if __name__ == '__main__':
+    main()
